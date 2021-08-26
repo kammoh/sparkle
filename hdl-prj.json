@@ -1,0 +1,26 @@
+{
+    "options": {
+        "ghdl_analysis": [
+            "-fexplicit",
+            "--std=08"
+        ]
+    },
+    "files": [
+        {
+            "file": "vhdl/util_pkg.vhdl",
+            "language": "vhdl"
+        },
+        {
+            "file": "vhdl/sipo.vhdl",
+            "language": "vhdl"
+        },
+        {
+            "file": "vhdl/piso.vhdl",
+            "language": "vhdl"
+        },
+        {
+            "file": "vhdl/sparkle.vhdl",
+            "language": "vhdl"
+        }
+    ]
+}

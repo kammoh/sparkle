@@ -1,0 +1,5 @@
+cocotb
+cocotb-test
+cffi
+typeguard
+pyvcd

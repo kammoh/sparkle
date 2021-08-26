@@ -1,0 +1,103 @@
+[[design]]
+name = "sparkle_vhdl_cc"
+rtl.sources = [
+    "vhdl/util_pkg.vhdl",
+    "vhdl/sipo.vhdl",
+    "vhdl/piso.vhdl",
+    "vhdl/sparkle.vhdl",  #
+]
+rtl.top = "sparkle"
+rtl.clock_port = "clk"
+tb.sources = [
+    "tb/ValidReadyTester.py",
+    "tb/test_sparkle.py",     #
+]
+tb.top = "tb.test_sparkle"
+tb.cocotb = true
+language.vhdl.standard = "2008"
+
+[[design]]
+name = "sparkle_vhdl_lwc"
+rtl.sources = [
+    "vhdl/util_pkg.vhdl",
+    "vhdl/sipo.vhdl",
+    "vhdl/piso.vhdl",
+    "vhdl/sparkle.vhdl",
+    "vhdl/LWC/NIST_LWAPI_pkg.vhd",
+    "vhdl/LWC/design_pkg.vhd",
+    "vhdl/LWC/cryptocore.vhd",
+    "vhdl/LWC/StepDownCountLd.vhd",
+    "vhdl/LWC/data_sipo.vhd",
+    "vhdl/LWC/key_piso.vhd",
+    "vhdl/LWC/data_piso.vhd",
+    "vhdl/LWC/PreProcessor.vhd",
+    "vhdl/LWC/PostProcessor.vhd",
+    "vhdl/LWC/fwft_fifo.vhd",
+    "vhdl/LWC/LWC.vhd",
+]
+rtl.top = "LWC"
+rtl.clock_port = "clk"
+tb.sources = ["tb/LWC_TB_pkg.vhd", "tb/LWC_TB.vhd"]
+tb.top = "LWC_TB"
+
+tb.generics.G_MAX_FAILURES = 1
+tb.generics.G_FNAME_PDI.file = "KAT/kats_for_verification/pdi.txt"
+tb.generics.G_FNAME_SDI.file = "KAT/kats_for_verification/sdi.txt"
+tb.generics.G_FNAME_DO.file = "KAT/kats_for_verification/do.txt"
+
+# tb.generics.G_FNAME_PDI.file = "kat1/pdi.txt"
+# tb.generics.G_FNAME_SDI.file = "kat1/sdi.txt"
+# tb.generics.G_FNAME_DO.file =  "kat1/do.txt"
+language.vhdl.standard = "2008"
+
+[[design]]
+name = "sparkle_blang"
+rtl.sources = [
+    "blang/bluelight/CryptoCore.bsv",
+    "blang/bluelight/Bus/BusDefines.bsv",
+    "blang/bluelight/Bus/BusFIFO.bsv",
+    "blang/bluelight/Bus/Bus.bsv",
+    "blang/bluelight/LwcApi.bsv",
+    "blang/bluelight/BluelightUtils.bsv",
+    "blang/Sparkle.bsv",
+]
+rtl.top = "lwc"
+rtl.clock_port = "clk"
+tb.sources = ["tb/sparkleTb.py"]
+tb.top = "tb.sparkleTb"
+tb.cocotb = { module = 'tb.sparkleTb' }
+
+[[design]]
+name = "sparkle_blang_v"
+rtl.sources = [
+    "gen_rtl/lwc.v",
+]
+rtl.top = "lwc"
+rtl.clock_port = "clk"
+tb.sources = ["tb/sparkleTb.py"]
+tb.top = "tb.sparkleTb"
+tb.cocotb = { module = 'tb.sparkleTb' }
+
+######################################## Flow Settings ########################################
+
+[flows.ghdl_sim]
+wave = true
+clean = false
+# dockerized = true
+docker_image = "kammoh/sim"
+
+[flows.yosys]
+fpga.device = "xc7a12"
+
+[flows.vivado_prj_synth]
+fpga.part = "xc7a12tcsg325-3"
+clock_period = 10.04          # ns
+# out_of_context = true
+synth.strategy = "Flow_PerfOptimized_high"
+impl.strategy = "Performance_ExploreWithRemap"
+synth.steps.SYNTH_DESIGN.ARGS.no_lc = 0
+synth.steps.SYNTH_DESIGN.ARGS.FLATTEN_HIERARCHY = 'full'  # 'full', 'rebuilt'
+
+[flows.vivado_synth]
+fpga.part = "xc7a12tcsg325-3"
+clock_period = 10.04

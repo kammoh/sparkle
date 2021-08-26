@@ -1,0 +1,13 @@
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.mypy_cache/
+
+*.so
+*.dylib
+*.a
+
+._bsc_/
+xeda_run/

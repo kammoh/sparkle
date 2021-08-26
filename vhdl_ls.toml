@@ -1,0 +1,7 @@
+[libraries]
+work.files = [
+  'vhdl/util_pkg.vhdl',
+  'vhdl/sipo.vhdl',
+  'vhdl/piso.vhdl',
+  'vhdl/sparkle.vhdl',
+]
