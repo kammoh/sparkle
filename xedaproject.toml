@@ -23,8 +23,9 @@ rtl.sources = [
     "vhdl/sipo.vhdl",
     "vhdl/piso.vhdl",
     "vhdl/sparkle.vhdl",
+    "vhdl/design_pkg.vhd",
     "vhdl/LWC/NIST_LWAPI_pkg.vhd",
-    "vhdl/LWC/design_pkg.vhd",
+    "vhdl/LWC/LWC_pkg.vhd",
     "vhdl/LWC/cryptocore.vhd",
     "vhdl/LWC/StepDownCountLd.vhd",
     "vhdl/LWC/data_sipo.vhd",
@@ -37,7 +38,7 @@ rtl.sources = [
 ]
 rtl.top = "LWC"
 rtl.clock_port = "clk"
-tb.sources = ["tb/LWC_TB_pkg.vhd", "tb/LWC_TB.vhd"]
+tb.sources = ["tb/LWC_TB.vhd"]
 tb.top = "LWC_TB"
 
 tb.generics.G_MAX_FAILURES = 1
@@ -81,10 +82,10 @@ tb.cocotb = { module = 'tb.sparkleTb' }
 ######################################## Flow Settings ########################################
 
 [flows.ghdl_sim]
-wave = true
-clean = false
+# wave = true
+clean = true
 # dockerized = true
-docker_image = "kammoh/sim"
+# docker_image = "kammoh/sim"
 
 [flows.yosys]
 fpga.device = "xc7a12"

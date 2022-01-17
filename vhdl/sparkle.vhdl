@@ -61,14 +61,14 @@ architecture RTL of sparkle is
   constant SPARKLE_STEPS_BIG  : positive := 11; -- 10, 11, 12
   constant SPARKLE_STEPS_SLIM : positive := 7; -- 8 for Sparkle512, o/w 7
 
-  subtype rate_bytevalid_t is slv_array_t(0 to RATE_WORDS - 1)(3 downto 0);
-  subtype rate_buffer_t is uint32_array_t(0 to RATE_WORDS - 1);
-  subtype key_buffer_t is uint32_array_t(0 to KEY_WORDS - 1);
-  subtype sparkle_state_t is uint32_array_t(0 to STATE_WORDS - 1);
+  subtype rate_bytevalid_t is t_slv_array(0 to RATE_WORDS - 1)(3 downto 0);
+  subtype rate_buffer_t is t_uint32_array(0 to RATE_WORDS - 1);
+  subtype key_buffer_t is t_uint32_array(0 to KEY_WORDS - 1);
+  subtype sparkle_state_t is t_uint32_array(0 to STATE_WORDS - 1);
   subtype step_t is unsigned(log2ceil(SPARKLE_STEPS_BIG) - 1 downto 0);
 
   type fsm_state_t is (INIT, PERMUTE, PROCESS_TEXT, FINALIZE_TAG);
-  type rcon_t is array (0 to 7) of uint32_t;
+  type rcon_t is array (0 to 7) of t_uint32;
 
   constant RCON : rcon_t := (
     X"B7E15162", X"BF715880", X"38B4DA56", X"324E7738",
@@ -76,14 +76,14 @@ architecture RTL of sparkle is
   );
 
   --======================================= Functions/Procedures ====================================================--
-  procedure arxbox1(r1, r2 : in natural range 0 to 31; c : in uint32_t; x, y : inout uint32_t) is
+  procedure arxbox1(r1, r2 : in natural range 0 to 31; c : in t_uint32; x, y : inout t_uint32) is
   begin
     x := x + rotate_right(y, r1);
     y := y xor rotate_right(x, r2);
     x := x xor c;
   end procedure;
 
-  procedure alzette(c : in uint32_t; x, y : inout uint32_t) is
+  procedure alzette(c : in t_uint32; x, y : inout t_uint32) is
   begin
     arxbox1(31, 24, c, x, y);
     arxbox1(17, 17, c, x, y);
@@ -91,13 +91,13 @@ architecture RTL of sparkle is
     arxbox1(24, 16, c, x, y);
   end procedure;
 
-  function ell(x : uint32_t) return uint32_t is
+  function ell(x : t_uint32) return t_uint32 is
   begin
     return rotate_right(x xor shift_left(x, 16), 16);
   end function;
 
   procedure linear_layer(state : inout sparkle_state_t) is
-    variable tmpx, tmpy, x0, y0 : uint32_t;
+    variable tmpx, tmpy, x0, y0 : t_uint32;
   begin
     tmpx                   := state(0);
     x0                     := state(0);
@@ -134,8 +134,8 @@ architecture RTL of sparkle is
     return t;
   end function;
 
-  function inbuf_word(w, xw : uint32_t; valid_bytes : std_logic_vector(3 downto 0); ct : boolean) return uint32_t is
-    variable word : uint32_t := w;
+  function inbuf_word(w, xw : t_uint32; valid_bytes : std_logic_vector(3 downto 0); ct : boolean) return t_uint32 is
+    variable word : t_uint32 := w;
   begin
     for i in 0 to 3 loop
       if ct and valid_bytes(i) = '0' then
@@ -172,7 +172,7 @@ architecture RTL of sparkle is
                     outbuf          : out rate_buffer_t;
                     outstate        : out sparkle_state_t) is
     variable in_xor_state : rate_buffer_t;
-    variable wi, wj, z, t : uint32_t;
+    variable wi, wj, z, t : t_uint32;
     variable const_x      : integer;
     variable j            : natural;
     variable state        : sparkle_state_t := instate;
@@ -219,15 +219,15 @@ architecture RTL of sparkle is
   signal perm_slim_steps, inbuf_ct, inbuf_hm, inbuf_ad, inbuf_eoi, outbuf_tag : boolean;
 
   --============================================== Wires ============================================================--
-  signal keybuf_slva                           : slv_array_t(0 to KEY_WORDS - 1)(IO_WIDTH - 1 downto 0);
-  signal inbuf_slva, outbuf_slva               : slv_array_t(0 to RATE_WORDS - 1)(IO_WIDTH - 1 downto 0);
+  signal keybuf_slva                           : t_slv_array(0 to KEY_WORDS - 1)(IO_WIDTH - 1 downto 0);
+  signal inbuf_slva, outbuf_slva               : t_slv_array(0 to RATE_WORDS - 1)(IO_WIDTH - 1 downto 0);
   signal input_word, output_word               : std_logic_vector(IO_WIDTH - 1 downto 0);
   signal output_validbytes                     : std_logic_vector(IO_WIDTH / 8 - 1 downto 0);
   signal keybuf                                : key_buffer_t;
   signal inbuf, outbuf                         : rate_buffer_t;
   signal rho_whitened_state                    : sparkle_state_t;
   signal inbuf_valid, inbuf_ready              : std_logic;
-  signal inbuf_valid_words, outbuf_valid_words : bit_array_t(0 to RATE_WORDS - 1);
+  signal inbuf_valid_words, outbuf_valid_words : t_bit_array(0 to RATE_WORDS - 1);
   signal keybuf_valid, keybuf_ready            : std_logic;
   signal outbuf_valid, outbuf_ready            : std_logic;
   signal inbuf_last, inbuf_incomp, outbuf_last : std_logic;
@@ -321,7 +321,7 @@ begin
 
   COMB_PROC : process(all)
     variable tmp_outbuf : rate_buffer_t;
-    variable tagbuf     : uint32_array_t(0 to TAG_WORDS - 1);
+    variable tagbuf     : t_uint32_array(0 to TAG_WORDS - 1);
     variable tmp_state  : sparkle_state_t;
   begin
     rho_whi(

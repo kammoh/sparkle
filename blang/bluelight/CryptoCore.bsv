@@ -71,14 +71,15 @@ typedef struct {
 } WithLast#(type w__)  deriving (Bits, Eq, FShow);
 
 typedef struct{
-    Bool npub;  // nonce public
-    Bool ad;    // associated data
-    Bool pt;    // plaintext
-    Bool ct;    // ciphertext
-    Bool ptct;  // PT or CT
-    Bool hm;    // hash message
-    Bool empty; // empty
-    Bool eoi;   // end of input: The segment is the last input segment other than TAG.
+    Bool npub;   // nonce public
+    Bool ad;     // associated data
+    Bool pt;     // plaintext
+    Bool length; // length
+    Bool ct;     // ciphertext
+    Bool ptct;   // PT or CT
+    Bool hm;     // hash message
+    Bool empty;  // empty
+    Bool eoi;    // end of input: The segment is the last input segment other than TAG.
 } HeaderFlags deriving(Bits, Eq, FShow);
 
 typedef struct {

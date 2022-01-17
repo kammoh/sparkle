@@ -10,20 +10,20 @@ use ieee.numeric_std_unsigned.all;
 
 package util_pkg is
   --=================================================================================================================--
-  subtype uint32_t is unsigned(31 downto 0);
-  type uint32_array_t is array (natural range <>) of uint32_t;
-  type bit_array_t is array (natural range <>) of std_logic;
-  type slv_array_t is array (natural range <>) of std_logic_vector;
-  type unsigned_array_t is array (natural range <>) of unsigned;
+  subtype t_uint32 is unsigned(31 downto 0);
+  type t_uint32_array is array (natural range <>) of t_uint32;
+  type t_bit_array is array (natural range <>) of std_logic;
+  type t_slv_array is array (natural range <>) of std_logic_vector;
+  type t_unsigned_array is array (natural range <>) of unsigned;
 
   --=================================================================================================================--
   --
   function log2ceil(n : positive) return natural;
   --
-  function to_uint32_array(a : slv_array_t) return uint32_array_t;
+  function to_uint32_array(a : t_slv_array) return t_uint32_array;
   --
   -- convert uint32_array_t to std_logic_vector(31 downto 0)
-  function to_slva(a : uint32_array_t) return slv_array_t;
+  function to_slva(a : t_uint32_array) return t_slv_array;
   --
   -- convert boolean to std_logic
   function to_sl(a : boolean) return std_logic;
@@ -41,8 +41,8 @@ package body util_pkg is
     return r;
   end function;
 
-  function to_uint32_array(a : slv_array_t) return uint32_array_t is
-    variable ret : uint32_array_t(a'range);
+  function to_uint32_array(a : t_slv_array) return t_uint32_array is
+    variable ret : t_uint32_array(a'range);
   begin
     for i in a'range loop
       ret(i) := unsigned(a(i));
@@ -50,9 +50,9 @@ package body util_pkg is
     return ret;
   end function;
 
-  function to_slva(a : uint32_array_t) return slv_array_t is
+  function to_slva(a : t_uint32_array) return t_slv_array is
     constant el  : unsigned := a(a'left);
-    variable ret : slv_array_t(a'range)(el'range);
+    variable ret : t_slv_array(a'range)(el'range);
   begin
     for i in a'range loop
       ret(i) := std_logic_vector(a(i));

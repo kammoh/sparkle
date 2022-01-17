@@ -2,8 +2,8 @@ library IEEE;
 use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
 
--- use work.NIST_LWAPI_pkg.all;
 use work.design_pkg.all;
+use work.LWC_pkg.all;
 use work.util_pkg.all;
 
 entity cryptocore is
@@ -113,11 +113,11 @@ begin
     end_of_block                 <= sparkle_bdo_bits_last;
     bdo_valid                    <= sparkle_bdo_valid;
     sparkle_bdo_ready            <= bdo_ready;
-    sparkle_key_bits_word        <= reverse_byte(key);
-    sparkle_bdi_bits_word        <= reverse_byte(bdi);
-    bdo                          <= reverse_byte(sparkle_bdo_bits_word);
-    bdo_valid_bytes              <= reverse_bit(sparkle_bdo_bits_valid_bytes);
-    sparkle_bdi_bits_valid_bytes <= reverse_bit(bdi_valid_bytes);
+    sparkle_key_bits_word        <= reverse_bytes(key);
+    sparkle_bdi_bits_word        <= reverse_bytes(bdi);
+    bdo                          <= reverse_bytes(sparkle_bdo_bits_word);
+    bdo_valid_bytes              <= reverse_bits(sparkle_bdo_bits_valid_bytes);
+    sparkle_bdi_bits_valid_bytes <= reverse_bits(bdi_valid_bytes);
     bdo_type                     <= (others => '-');
     msg_auth_valid               <= '1' when send_auth else '0';
     msg_auth                     <= '1' when auth_success else '0';

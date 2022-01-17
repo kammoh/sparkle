@@ -18,9 +18,9 @@ entity PISO is
     clk                  : in  std_logic;
     reset                : in  std_logic;
     --
-    in_bits_block        : in  slv_array_t(0 to NUM_WORDS - 1)(WORD_WIDTH - 1 downto 0);
-    in_bits_valid_words  : in  bit_array_t(0 to NUM_WORDS - 1);
-    in_bits_valid_bytes  : in  slv_array_t(0 to NUM_WORDS - 1)(WORD_WIDTH / 8 - 1 downto 0);
+    in_bits_block        : in  t_slv_array(0 to NUM_WORDS - 1)(WORD_WIDTH - 1 downto 0);
+    in_bits_valid_words  : in  t_bit_array(0 to NUM_WORDS - 1);
+    in_bits_valid_bytes  : in  t_slv_array(0 to NUM_WORDS - 1)(WORD_WIDTH / 8 - 1 downto 0);
     in_bits_last         : in  std_logic;
     in_valid             : in  std_logic;
     in_ready             : out std_logic;
@@ -35,9 +35,9 @@ end entity PISO;
 
 architecture RTL of PISO is
   --============================================ Registers ==========================================================--
-  signal data_block : slv_array_t(0 to NUM_WORDS - 1)(WORD_WIDTH - 1 downto 0);
-  signal validwords : bit_array_t(0 to NUM_WORDS - 1);
-  signal validbytes : slv_array_t(0 to NUM_WORDS - 1)(WORD_WIDTH / 8 - 1 downto 0);
+  signal data_block : t_slv_array(0 to NUM_WORDS - 1)(WORD_WIDTH - 1 downto 0);
+  signal validwords : t_bit_array(0 to NUM_WORDS - 1);
+  signal validbytes : t_slv_array(0 to NUM_WORDS - 1)(WORD_WIDTH / 8 - 1 downto 0);
   signal last_block : std_logic;
 
   --============================================== Wires ============================================================--

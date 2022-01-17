@@ -1,7 +1,10 @@
 [libraries]
-work.files = [
+SPARKLE_LIB.files = [
   'vhdl/util_pkg.vhdl',
   'vhdl/sipo.vhdl',
   'vhdl/piso.vhdl',
-  'vhdl/sparkle.vhdl',
+  'vhdl/*.vhdl',
+  'vhdl/LWC/*.vhd',
+  'vhdl/**/*.vhd',
+  'vhdl/**/*.vhdl',
 ]

@@ -15,12 +15,12 @@ use work.util_pkg.all;
 
 entity SIPO is
   generic(
-    WORD_WIDTH       : positive;        -- width of each word in bits
-    NUM_WORDS        : positive;        -- depth
-    WITH_VALID_BYTES : boolean;         -- if  for each byte a valid flag is stored
-    ZERO_FILL        : boolean;         -- When `in_bits_last` fill `m` remaining free space with zeros in `m` clock cycles
+    WORD_WIDTH       : positive                     := 32;              -- width of each word in bits
+    NUM_WORDS        : positive                     := 8;               -- depth
+    WITH_VALID_BYTES : boolean                      := FALSE;           -- if  for each byte a valid flag is stored
+    ZERO_FILL        : boolean                      := FALSE;           -- When `in_bits_last` fill `m` remaining free space with zeros in `m` clock cycles
     PADDING_BYTE     : std_logic_vector(7 downto 0) := (others => '0'); -- padding byte
-    PIPELINED        : boolean                      := TRUE -- simultanous dequeue and enqueue when full
+    PIPELINED        : boolean                      := TRUE             -- simultanous dequeue and enqueue when full
   );
   port(
     clk                  : in  std_logic;
@@ -32,9 +32,9 @@ entity SIPO is
     in_valid             : in  std_logic;
     in_ready             : out std_logic;
     --
-    out_bits_block       : out slv_array_t(0 to NUM_WORDS - 1)(WORD_WIDTH - 1 downto 0);
-    out_bits_valid_words : out bit_array_t(0 to NUM_WORDS - 1); -- each bit shows the word is valid at all or not (could be empty, but valid!)
-    out_bits_bva         : out slv_array_t(0 to NUM_WORDS - 1)(WORD_WIDTH / 8 - 1 downto 0); -- array of valid bytes
+    out_bits_block       : out t_slv_array(0 to NUM_WORDS - 1)(WORD_WIDTH - 1 downto 0);
+    out_bits_valid_words : out t_bit_array(0 to NUM_WORDS - 1); -- each bit shows the word is valid at all or not (could be empty, but valid!)
+    out_bits_bva         : out t_slv_array(0 to NUM_WORDS - 1)(WORD_WIDTH / 8 - 1 downto 0); -- array of valid bytes
     out_bits_last        : out std_logic;
     out_bits_incomp      : out std_logic; -- incomplete block (only if WITH_BYTE_VALIDS = TRUE)
     out_valid            : out std_logic;
@@ -43,13 +43,13 @@ entity SIPO is
 end entity SIPO;
 
 architecture RTL of SIPO is
-  -- crashes GHDL: subtype block_t is slv_array_t(0 to NUM_WORDS - 1)(WORD_WIDTH - 1 downto 0);
-  type block_t is array (0 to NUM_WORDS - 1) of std_logic_vector(WORD_WIDTH - 1 downto 0);
-  type validbytes_array_t is array (0 to NUM_WORDS - 1) of std_logic_vector(WORD_WIDTH / 8 - 1 downto 0);
+  subtype t_block is t_slv_array(0 to NUM_WORDS - 1)(WORD_WIDTH - 1 downto 0);
+  -- type block_t is array (0 to NUM_WORDS - 1) of std_logic_vector(WORD_WIDTH - 1 downto 0);
+  type t_validbytes_array is array (0 to NUM_WORDS - 1) of std_logic_vector(WORD_WIDTH / 8 - 1 downto 0);
   --============================================ Registers ==========================================================--
-  signal block_reg               : block_t;
-  signal validbytes              : validbytes_array_t;
-  signal word_valids             : bit_array_t(0 to NUM_WORDS - 1);
+  signal block_reg               : t_block;
+  signal validbytes              : t_validbytes_array;
+  signal word_valids             : t_bit_array(0 to NUM_WORDS - 1);
   signal fill_zeros              : boolean;
   signal last                    : std_logic;
   signal do_pad_byte, incomplete : boolean;
