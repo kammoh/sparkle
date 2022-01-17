@@ -246,21 +246,6 @@ end LWC_pkg;
 package body LWC_pkg is
 
     --======================================== Functions ========================================--
-    function Byte_To_Bits_EXP(
-        bytes_in : std_logic_vector
-    ) return std_logic_vector is
-
-        variable bits : std_logic_vector((8 * bytes_in'length) - 1 downto 0);
-    begin
-        for i in 0 to bytes_in'length - 1 loop
-            if (bytes_in(i) = '1') then
-                bits(8 * (i + 1) - 1 downto 8 * i) := (others => '1');
-            else
-                bits(8 * (i + 1) - 1 downto 8 * i) := (others => '0');
-            end if;
-        end loop;
-        return bits;
-    end Byte_To_Bits_EXP;
 
     function clear_invalid_bytes(bdo_data, bdo_valid_bytes : std_logic_vector) return std_logic_vector is
         variable bdo_cleared : std_logic_vector(bdo_data'range) := (others => '0');
@@ -677,17 +662,16 @@ package body LWC_pkg is
         return result;
     end function;
 
-
-    function lwc_to_string(slv : std_logic_vector) return STRING is
-        type sl_map_type is array (std_logic) of character;
-        constant sl_map : sl_map_type := "UX01ZWLH-";
-         alias av : std_logic_vector(1 to slv'length) is slv;
-        variable ret : string (1 to slv'length) := (others => NUL);
-    begin
-        for i in ret'range loop
-            ret(i) := sl_map (av (i));
-        end loop;
-    return ret;
-    end function;
+    -- function lwc_to_string(slv : std_logic_vector) return STRING is
+    --     type sl_map_type is array (std_logic) of character;
+    --     constant sl_map : sl_map_type := "UX01ZWLH-";
+    --      alias av : std_logic_vector(1 to slv'length) is slv;
+    --     variable ret : string (1 to slv'length) := (others => NUL);
+    -- begin
+    --     for i in ret'range loop
+    --         ret(i) := sl_map (av (i));
+    --     end loop;
+    -- return ret;
+    -- end function;
 
 end package body;

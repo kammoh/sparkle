@@ -10,6 +10,7 @@
 --===================================================================================================================--
 library IEEE;
 use IEEE.std_logic_1164.all;
+use IEEE.numeric_std.all;
 
 use work.util_pkg.all;
 
@@ -19,7 +20,7 @@ entity SIPO is
     NUM_WORDS        : positive                     := 8;               -- depth
     WITH_VALID_BYTES : boolean                      := FALSE;           -- if  for each byte a valid flag is stored
     ZERO_FILL        : boolean                      := FALSE;           -- When `in_bits_last` fill `m` remaining free space with zeros in `m` clock cycles
-    PADDING_BYTE     : std_logic_vector(7 downto 0) := (others => '0'); -- padding byte
+    PADDING_BYTE     : unsigned(7 downto 0) := (others => '0'); -- padding byte
     PIPELINED        : boolean                      := TRUE             -- simultanous dequeue and enqueue when full
   );
   port(
@@ -43,12 +44,9 @@ entity SIPO is
 end entity SIPO;
 
 architecture RTL of SIPO is
-  subtype t_block is t_slv_array(0 to NUM_WORDS - 1)(WORD_WIDTH - 1 downto 0);
-  -- type block_t is array (0 to NUM_WORDS - 1) of std_logic_vector(WORD_WIDTH - 1 downto 0);
-  type t_validbytes_array is array (0 to NUM_WORDS - 1) of std_logic_vector(WORD_WIDTH / 8 - 1 downto 0);
   --============================================ Registers ==========================================================--
-  signal block_reg               : t_block;
-  signal validbytes              : t_validbytes_array;
+  signal block_reg               : t_slv_array(0 to NUM_WORDS - 1)(WORD_WIDTH - 1 downto 0);
+  signal validbytes              : t_slv_array(0 to NUM_WORDS - 1)(WORD_WIDTH / 8 - 1 downto 0);
   signal word_valids             : t_bit_array(0 to NUM_WORDS - 1);
   signal fill_zeros              : boolean;
   signal last                    : std_logic;
@@ -58,7 +56,6 @@ architecture RTL of SIPO is
   signal do_enq, do_deq, do_shiftin, full, one_short : boolean;
   signal next_word                                   : std_logic_vector(WORD_WIDTH - 1 downto 0);
   signal next_validbytes                             : std_logic_vector(WORD_WIDTH / 8 - 1 downto 0);
-  signal fill_zero_1st_byte                          : std_logic_vector(7 downto 0);
 
 begin
   full      <= word_valids(0) = '1';
@@ -81,14 +78,13 @@ begin
   out_bits_valid_words <= word_valids;
 
   GEN_FILL_ZERO : if ZERO_FILL generate
-    fill_zero_1st_byte <= PADDING_BYTE when do_pad_byte else (others => '0');
     GEM_PIPELINED_FZ : if PIPELINED generate
       in_ready <= '1' when not fill_zeros and (not full or do_deq) else '0';
     else generate
       in_ready <= '1' when not fill_zeros and not full else '0';
     end generate;
 
-    next_word <= (7 downto 0 => fill_zero_1st_byte, others => '0') when fill_zeros else in_bits_word;
+    next_word <= in_bits_word when not fill_zeros else std_logic_vector(resize(PADDING_BYTE, next_word'length)) when do_pad_byte else (others => '0');
 
     process(clk)
     begin

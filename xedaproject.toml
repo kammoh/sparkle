@@ -92,7 +92,7 @@ fpga.device = "xc7a12"
 
 [flows.vivado_prj_synth]
 fpga.part = "xc7a12tcsg325-3"
-clock_period = 10.04          # ns
+clock_period = 10.3          # ns
 # out_of_context = true
 synth.strategy = "Flow_PerfOptimized_high"
 impl.strategy = "Performance_ExploreWithRemap"
@@ -101,4 +101,6 @@ synth.steps.SYNTH_DESIGN.ARGS.FLATTEN_HIERARCHY = 'full'  # 'full', 'rebuilt'
 
 [flows.vivado_synth]
 fpga.part = "xc7a12tcsg325-3"
-clock_period = 10.04
+synth.strategy = "Timing"
+impl.strategy = "Timing"
+clock_period = 10.2

@@ -133,12 +133,12 @@ architecture TB of LWC_TB is
     end function;
 
     -- sum up all shares. Returns do_data if num_shares=1)
-    function xor_shares(do_data : std_logic_vector; num_shares : positive) return std_logic_vector is
-        constant share_width : natural                                    := do_data'length / num_shares;
-        variable ret         : std_logic_vector(share_width - 1 downto 0) := do_data(share_width - 1 downto 0);
+    function xor_shares(slv : std_logic_vector; num_shares : positive) return std_logic_vector is
+        constant share_width : natural                                    := slv'length / num_shares;
+        variable ret         : std_logic_vector(share_width - 1 downto 0) := slv(share_width - 1 downto 0);
     begin
         for i in 1 to num_shares - 1 loop
-            ret := ret xor do_data((i + 1) * share_width - 1 downto i * share_width);
+            ret := ret xor slv((i + 1) * share_width - 1 downto i * share_width);
         end loop;
         return ret;
     end function;
