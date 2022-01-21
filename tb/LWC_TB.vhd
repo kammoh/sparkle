@@ -29,10 +29,13 @@ entity LWC_TB IS
     generic(
         G_MAX_FAILURES     : integer := 0; --! Maximum number of failures before stopping the simulation
         G_TEST_MODE        : integer := 0; --! 0: normal, 1: stall both sdi/pdi_valid and do_ready, 2: stall sdi/pdi_valid, 3: stall do_ready, 4: Timing (cycle) measurement 
-        G_TEST_IPSTALL     : integer := 3; --! Number of cycles to stall pdi_valid
-        G_TEST_ISSTALL     : integer := 3; --! Number of cycles to stall sdi_valid
-        G_TEST_OSTALL      : integer := 3; --! Number of cycles to stall do_ready
-        G_PERIOD_PS        : integer := 10_000; --! Simulation clock period in picoseconds
+        G_PDI_STALLS       : integer := 3; --! Number of cycles to stall pdi_valid
+        G_SDI_STALLS       : integer := 3; --! Number of cycles to stall sdi_valid
+        G_DO_STALLS        : integer := 3; --! Number of cycles to stall do_ready
+        G_RDI_STALLS       : integer := 3; --! Number of cycles to stall rdi_valid
+        G_RANDOM_STALL     : boolean := FALSE; --! Randomized stalls
+        G_RANDOM_SEED      : integer := 1; --! Seed used for all random generation, must be positive
+        G_CLK_PERIOD_PS    : integer := 10_000; --! Simulation clock period in picoseconds
         G_FNAME_PDI        : string  := "../KAT/v1/pdi.txt"; --! Path to the input file containing cryptotvgen PDI testvector data
         G_FNAME_SDI        : string  := "../KAT/v1/sdi.txt"; --! Path to the input file containing cryptotvgen SDI testvector data
         G_FNAME_RDI        : string  := "../KAT/v1/rdi.txt"; --! Path to the input file containing random data
@@ -41,8 +44,10 @@ entity LWC_TB IS
         G_FNAME_TIMING     : string  := "timing.txt"; --! Path to the generated timing measurements (when G_TEST_MODE=4)
         G_FNAME_FAILED_TVS : string  := "failed_testvectors.txt"; --! Path to the generated log of failed testvector words
         G_FNAME_RESULT     : string  := "result.txt"; --! Path to the generated result file containing 0 or 1  -- REDUNDANT / NOT USED
-        G_PRERESET_WAIT_NS : integer := 0; --! Time (in nanosecods) to wait before reseting UUT. Xilinx GSR takes 100ns, required for post-synth simulation
-        G_INPUT_DELAY_NS   : integer := 0 --! Input delay
+        G_PRERESET_WAIT_NS : integer := 0; --! Time (in nanoseconds) to wait before reseting UUT. Xilinx GSR takes 100ns, required for post-synth simulation
+        G_INPUT_DELAY_NS   : integer := 0; --! Input delay in nanoseconds
+        G_TIMEOUT_CYCLES   : integer := 0; --! Fail simulation after this many consecutive cycles of data I/O inactivity, 0: disable timeout
+        G_VERBOSE_LEVEL    : integer := 0 --! verbosity level
     );
 end LWC_TB;
 
@@ -51,17 +56,16 @@ architecture TB of LWC_TB is
     constant W_S         : positive       := W * PDI_SHARES;
     constant SW_S        : positive       := SW * SDI_SHARES;
     constant input_delay : TIME           := G_INPUT_DELAY_NS * ns;
-    constant clk_period  : TIME           := G_PERIOD_PS * ps;
+    constant clk_period  : TIME           := G_CLK_PERIOD_PS * ps;
     constant TB_HEAD     : string(1 to 6) := "# TB :";
-    -- can be placed in the middle of a file
-    constant EOF_HEAD    : string(1 to 6) := "###EOF";
     constant INS_HEAD    : string(1 to 6) := "INS = ";
     constant HDR_HEAD    : string(1 to 6) := "HDR = ";
     constant DAT_HEAD    : string(1 to 6) := "DAT = ";
     constant STT_HEAD    : string(1 to 6) := "STT = ";
+    -- if placed anywhere in do.txt, subsequent testcases are skipped
+    constant EOF_HEAD    : string(1 to 6) := "###EOF";
 
-    constant TESTMODE_NORMAL : integer := 0;
-    constant TESTMODE_TIMING : integer := 4;
+    constant TIMING_MODE : boolean := G_TEST_MODE = 4;
 
     --=================================================== Signals ===================================================--
     --! stop clock generation
@@ -96,16 +100,81 @@ architecture TB of LWC_TB is
     signal rdi_valid           : std_logic                           := '0';
     signal rdi_valid_delayed   : std_logic                           := '0';
     signal rdi_ready           : std_logic;
-    --   unshared version of DO
-    signal do_sum              : std_logic_vector(W - 1 downto 0);
     -- Counters
     signal pdi_operation_count : integer                             := 0;
     signal cycle_counter       : natural                             := 0;
+    signal watchdog_counter    : natural                             := 0;
     signal num_rand_vectors    : natural                             := 0;
     --
     signal start_cycle         : natural;
     signal timing_started      : boolean                             := False;
     signal timing_stopped      : boolean                             := False;
+    -- random number generation (requires VHDL 2000+)
+    -- from from VHDL-extras (http://github.com/kevinpt/vhdl-extras)
+    use ieee.math_real.all;
+    type rand_state is protected
+        procedure seed(s : in positive);
+        impure function random return real;
+    end protected;
+    type rand_state is protected body
+        variable seed1 : positive;
+        variable seed2 : positive;
+        procedure seed(s : in positive) is
+        begin
+            seed1 := s;
+            if s > 1 then
+                seed2 := s - 1;
+            else
+                seed2 := s + 42;
+            end if;
+        end procedure;
+        impure function random return real is
+            variable result : real;
+        begin
+            uniform(seed1, seed2, result);
+            return result;
+        end function;
+    end protected body;
+    shared variable prng       : rand_state;
+    --
+    impure function random return real is
+    begin
+        return prng.random;
+    end function;
+    procedure seed(s : positive) is
+    begin
+        prng.seed(s);
+    end procedure;
+    -- End VHDL 2000+
+    --
+    impure function random(min, max : integer) return integer is
+    begin
+        return integer(trunc(real(max - min + 1) * random)) + min;
+    end function;
+
+    impure function random return boolean is
+    begin
+        return random(0, 1) = 1;
+    end function;
+
+    impure function random(size : natural) return std_logic_vector is
+        -- Populate vector in 30-bit chunks to avoid exceeding the
+        -- range of integer
+        constant seg_size  : natural := 30;
+        constant segments  : natural := size / seg_size;
+        constant remainder : natural := size - segments * seg_size;
+        variable result    : std_logic_vector(size - 1 downto 0);
+    begin
+        if segments > 0 then
+            for s in 0 to segments - 1 loop
+                result((s + 1) * seg_size - 1 downto s * seg_size) := std_logic_vector(to_unsigned(random(0, 2 ** seg_size - 1), seg_size));
+            end loop;
+        end if;
+        if remainder > 0 then
+            result(size - 1 downto size - remainder) := std_logic_vector(to_unsigned(random(0, 2 ** remainder - 1), remainder));
+        end if;
+        return result;
+    end function;
 
     --================================================== I/O files ==================================================--
     -- cryptotvgen KAT files
@@ -114,15 +183,15 @@ architecture TB of LWC_TB is
     file do_file       : TEXT open READ_MODE is G_FNAME_DO; -- always required
     file rdi_file      : TEXT;
     -- output files
-    file log_file      : TEXT open write_mode is G_FNAME_LOG;
+    file log_file      : TEXT;
     file timing_file   : TEXT;
-    file result_file   : TEXT open write_mode is G_FNAME_RESULT;
-    file failures_file : TEXT open write_mode is G_FNAME_FAILED_TVS;
+    file result_file   : TEXT open WRITE_MODE is G_FNAME_RESULT;
+    file failures_file : TEXT open WRITE_MODE is G_FNAME_FAILED_TVS;
 
     --================================================== functions ==================================================--
     -- compare received word against expected word
     -- returns true if they match or if the unmatched bit was a don't-care
-    function word_pass(actual, expected : std_logic_vector) return boolean is
+    function words_match(actual, expected : std_logic_vector) return boolean is
     begin
         for i in expected'range loop
             if actual(i) /= expected(i) and expected(i) /= 'X' and expected(i) /= '-' then
@@ -143,16 +212,21 @@ architecture TB of LWC_TB is
         return ret;
     end function;
 
-    -- TODO re-implement random stalls
-    impure function get_stalls(max_stalls : integer) return integer is
+    impure function get_stalls(max_stalls : natural) return natural is
     begin
-        return max_stalls;
+        if G_TEST_MODE = 0 or TIMING_MODE then
+            return 0;
+        elsif G_RANDOM_STALL then
+            return random(0, 1) * random(1, max_stalls); -- 50%: no stall. 50%: 1..max_stalls
+        else
+            return max_stalls;
+        end if;
     end function;
 
 begin
     --===========================================================================================--
     -- generate clock
-    clockProProc : process
+    Clock_PROCESS : process
     begin
         if not stop_clock then
             clk <= '1';
@@ -165,13 +239,18 @@ begin
     end process;
 
     -- generate reset
-    resetProc : process
+    Reset_PROCESS : process
     begin
         report LF & " -- Testvectors:  " & G_FNAME_PDI & " " & G_FNAME_SDI & " " & G_FNAME_DO & LF &
-        " -- Clock Period: " & integer'image(G_PERIOD_PS) & " ps" & LF &
-        " -- Test Mode:    " & integer'image(G_TEST_MODE) & LF &
-        " -- Max Failures: " & integer'image(G_MAX_FAILURES) & LF & CR severity note;
+        " -- Clock Period:  " & integer'image(G_CLK_PERIOD_PS) & " ps" & LF &
+        " -- Max Failures:  " & integer'image(G_MAX_FAILURES) & LF & 
+        " -- Timout Cycles: " & integer'image(G_TIMEOUT_CYCLES) & LF &
+        " -- Test Mode:     " & integer'image(G_TEST_MODE) & LF &
+        " -- Random Seed:   " & integer'image(G_RANDOM_SEED) & LF &
+        " -- Test Mode:     " & integer'image(G_TEST_MODE) & LF &
+        CR severity note;
 
+        seed(G_RANDOM_SEED);
         wait for G_PRERESET_WAIT_NS * ns;
         if ASYNC_RSTN then
             rst <= '0';
@@ -188,10 +267,26 @@ begin
         wait;
     end process;
 
-    cycleCountProc : process(clk)
+    Cycle_Counter_PROCESS : process(clk)
     begin
         if reset_done and rising_edge(clk) then
             cycle_counter <= cycle_counter + 1;
+        end if;
+    end process;
+
+    -- terminates simulation
+    Timeout_Watchdog_PROCESS : process(clk)
+    begin
+        if G_TIMEOUT_CYCLES > 0 and reset_done and rising_edge(clk) then
+            if (pdi_valid and pdi_ready) = '1' --
+                or (sdi_valid and sdi_ready) = '1' or (do_valid and do_ready) = '1' then
+                watchdog_counter <= 0;
+            else
+                watchdog_counter <= watchdog_counter + 1;
+                assert watchdog_counter < G_TIMEOUT_CYCLES --
+                report "[FAIL] Timeout after " & integer'image(watchdog_counter) & " cycles!"
+                severity failure;
+            end if;
         end if;
     end process;
 
@@ -225,8 +320,6 @@ begin
     sdi_valid_delayed <= transport sdi_valid after input_delay;
     do_ready_delayed  <= transport do_ready after input_delay;
 
-    do_sum <= xor_shares(do_data, PDI_SHARES);
-
     GEN_RDI : if RW > 0 generate
     begin
         rdi_data_delayed  <= transport rdi_data after input_delay;
@@ -239,8 +332,15 @@ begin
             report LF & "RW=" & integer'image(RW);
             wait until reset_done and rising_edge(clk);
             if G_FNAME_RDI'length < 1 then
-                rdi_data  <= (others => '1');
-                rdi_valid <= '1';
+                loop
+                    for i in 0 to get_stalls(G_RDI_STALLS) - 1 loop
+                        rdi_valid <= '0';
+                        wait until rising_edge(clk);
+                    end loop;
+                    rdi_data  <= random(RW);
+                    rdi_valid <= '1';
+                    wait until rising_edge(clk) and rdi_ready = '1' and rdi_valid_delayed = '1';
+                end loop;
             else
                 file_open(rdi_file, G_FNAME_RDI, READ_MODE);
                 loop
@@ -266,11 +366,14 @@ begin
                         report "Error while reading " & G_FNAME_RDI severity failure;
                         exit;           -- exit the loop
                     end if;
+                    for i in 0 to get_stalls(G_RDI_STALLS) - 1 loop
+                        rdi_valid <= '0';
+                        wait until rising_edge(clk);
+                    end loop;
                     rdi_data         <= rdi_vec;
                     rdi_valid        <= '1';
                     wait until rising_edge(clk) and rdi_ready = '1' and rdi_valid_delayed = '1';
                     num_rand_vectors <= num_rand_vectors + 1;
-                    rdi_valid        <= '0';
                 end loop;
                 file_close(rdi_file);
             end if;
@@ -281,15 +384,14 @@ begin
     --===========================================================================================--
     --====================================== PDI Stimulus =======================================--
     tb_read_pdi : process
-        variable line_data    : LINE;
-        variable word_block   : std_logic_vector(W_S - 1 downto 0) := (others => '0');
-        variable read_ok      : boolean;
-        variable line_head    : string(1 to 6);
-        variable stall_cycles : integer;
-        variable actkey_ins   : boolean;
-        variable hash_ins     : boolean;
+        variable line_data  : LINE;
+        variable word_block : std_logic_vector(W_S - 1 downto 0) := (others => '0');
+        variable read_ok    : boolean;
+        variable line_head  : string(1 to 6);
+        variable actkey_ins : boolean;
+        variable hash_ins   : boolean;
         -- instruction other than actkey or hash was already sent
-        variable op_sent      : boolean                            := False;
+        variable op_sent    : boolean                            := False;
     begin
         -- wait for the clock edge after reset is complete
         wait until reset_done;
@@ -309,15 +411,11 @@ begin
                     end if;
                     actkey_ins := (line_head = INS_HEAD) and (word_block(W - 1 downto W - 4) = INST_ACTKEY);
                     hash_ins   := (line_head = INS_HEAD) and (word_block(W - 1 downto W - 4) = INST_HASH);
-                    -- stalls
-                    if G_TEST_MODE = 1 or G_TEST_MODE = 2 then
-                        stall_cycles := get_stalls(G_TEST_IPSTALL);
-                        if stall_cycles > 0 then
-                            pdi_valid <= '0';
-                            wait for stall_cycles * clk_period;
-                            wait until rising_edge(clk); -- TODO verify number of generated stall cycles
-                        end if;
-                    elsif G_TEST_MODE = TESTMODE_TIMING and line_head = INS_HEAD and (actkey_ins or hash_ins or op_sent) and timing_started then
+                    for i in 0 to get_stalls(G_PDI_STALLS) - 1 loop
+                        pdi_valid <= '0';
+                        wait until rising_edge(clk);
+                    end loop;
+                    if TIMING_MODE and line_head = INS_HEAD and (actkey_ins or hash_ins or op_sent) and timing_started then
                         if not timing_stopped then
                             pdi_valid <= '0';
                             wait until rising_edge(clk) and timing_stopped; -- wait for tb_verify_do process to complete timed operation
@@ -329,7 +427,7 @@ begin
                     pdi_data  <= word_block;
                     wait until rising_edge(clk) and pdi_ready = '1';
                     -- NOTE: should never stall here
-                    if G_TEST_MODE = TESTMODE_TIMING and line_head = INS_HEAD then
+                    if TIMING_MODE and line_head = INS_HEAD then
                         op_sent := not actkey_ins and not hash_ins;
                         if not timing_started then
                             start_cycle    <= cycle_counter;
@@ -352,11 +450,10 @@ begin
     --===========================================================================================--
     --====================================== SDI Stimulus =======================================--
     tb_read_sdi : process
-        variable line_data    : LINE;
-        variable word_block   : std_logic_vector(SW_S - 1 downto 0);
-        variable read_ok      : boolean;
-        variable line_head    : string(1 to 6);
-        variable stall_cycles : integer;
+        variable line_data  : LINE;
+        variable word_block : std_logic_vector(SW_S - 1 downto 0);
+        variable read_ok    : boolean;
+        variable line_head  : string(1 to 6);
     begin
         wait until reset_done;
         wait until rising_edge(clk);
@@ -372,16 +469,14 @@ begin
                         if not read_ok then
                             exit;
                         end if;
-                        if G_TEST_MODE = 1 or G_TEST_MODE = 2 then
-                            stall_cycles := get_stalls(G_TEST_ISSTALL);
-                            if stall_cycles > 0 then
-                                sdi_valid <= '0';
-                                wait for stall_cycles * clk_period;
-                            end if;
-                        elsif G_TEST_MODE = TESTMODE_TIMING and not timing_started then
+                        if TIMING_MODE and not timing_started then
                             sdi_valid <= '0';
                             wait until timing_started;
                         end if;
+                        for i in 0 to get_stalls(G_SDI_STALLS) - 1 loop
+                            sdi_valid <= '0';
+                            wait until rising_edge(clk);
+                        end loop;
                         sdi_valid <= '1';
                         sdi_data  <= word_block;
                         wait until rising_edge(clk) and sdi_ready = '1';
@@ -405,23 +500,24 @@ begin
         variable read_ok      : boolean;
         variable preamble     : string(1 to 6);
         variable word_count   : integer := 1;
-        variable force_exit   : boolean := False;
-        variable failed       : boolean := False;
+        variable force_exit   : boolean := FALSE;
         variable msgid        : integer;
         variable keyid        : integer;
         variable opcode       : std_logic_vector(3 downto 0);
-        variable num_fails    : integer := 0;
+        variable num_failures : integer := 0;
+        variable current_fail : boolean := FALSE;
         variable testcase     : integer := 0;
-        variable stall_cycles : integer;
         variable cycles       : integer;
         variable end_cycle    : natural;
         variable end_time     : TIME;
+        variable do_sum       : std_logic_vector(W - 1 downto 0);
     begin
         wait until reset_done;
         wait until rising_edge(clk);
-        if G_TEST_MODE = TESTMODE_TIMING then
+        if TIMING_MODE then
             file_open(timing_file, G_FNAME_TIMING, WRITE_MODE);
         end if;
+        file_open(log_file, G_FNAME_LOG, WRITE_MODE);
         while not endfile(do_file) and not force_exit loop
             loop
                 if endfile(do_file) then
@@ -445,21 +541,17 @@ begin
                 report "Reached EOF marker in " & G_FNAME_DO severity warning;
                 force_exit := True;
                 exit;
-            elsif preamble = STT_HEAD or preamble = HDR_HEAD or preamble = DAT_HEAD then --valid  do.txt lines are: header, data, and status
+            elsif preamble = HDR_HEAD or preamble = DAT_HEAD or preamble = STT_HEAD then -- header, data, or status lines
                 loop                    -- processing single line
                     lwc_hread(line_data, word_block, read_ok); -- read the rest of the line to word_block
                     if not read_ok then
                         exit;
                     end if;
-                    -- stalls
-                    if G_TEST_MODE = 1 or G_TEST_MODE = 3 then
-                        stall_cycles := get_stalls(G_TEST_OSTALL);
-                        if stall_cycles > 0 then
-                            do_ready <= '0';
-                            wait for stall_cycles * clk_period;
-                            -- wait until rising_edge(clk);
-                        end if;
-                    elsif G_TEST_MODE = TESTMODE_TIMING and not timing_started then
+                    for i in 0 to get_stalls(G_DO_STALLS) - 1 loop
+                        do_ready <= '0';
+                        wait until rising_edge(clk);
+                    end loop;
+                    if TIMING_MODE and not timing_started then
                         -- stall until timing has started from PDI
                         do_ready       <= '0';
                         timing_stopped <= False;
@@ -468,29 +560,23 @@ begin
                     do_ready <= '1';
                     wait until rising_edge(clk) and do_valid = '1';
                     assert preamble /= STT_HEAD or do_last = '1' report "Status word received, but do_last was not '1'" severity error;
-                    if not word_pass(do_sum, word_block) then
-                        failed    := True;
-                        write(logMsg, string'("[Log] Msg ID #") & integer'image(msgid) & string'(" fails at line #") & integer'image(line_no) & string'(" word #") & integer'image(word_count));
+                    do_sum   := xor_shares(do_data, PDI_SHARES);
+                    if not words_match(do_sum, word_block) then
+                        write(logMsg, string'("[Error]  " & " Msg ID #") & integer'image(msgid) & string'(" failed at line #") & integer'image(line_no) & string'(" word #") & integer'image(word_count));
                         writeline(log_file, logMsg);
-                        write(logMsg, string'("[Log]     Expected: ") & lwc_to_hstring(word_block) & string'(" Received: ") & lwc_to_hstring(do_sum));
+                        write(logMsg, string'("     Expected: ") & lwc_to_hstring(word_block) & string'(" Received: ") & lwc_to_hstring(do_sum));
+                        report logMsg.all severity error;
                         writeline(log_file, logMsg);
-                        report " --- MsgID #" & integer'image(testcase)
-                                & " Data line #" & integer'image(line_no)
-                                & " Word #" & integer'image(word_count)
-                                & " at " & TIME'image(now) & " FAILS ---"
-                        severity error;
-                        report "Expected: " & lwc_to_hstring(word_block)
-                                & "   Actual: " & lwc_to_hstring(do_sum) severity error;
-                        write(result_file, string'("fail"));
-                        num_fails := num_fails + 1;
-                        write(failMsg, string'("Failure #") & integer'image(num_fails) & " MsgID: " & integer'image(testcase)); -- & " Operation: ");
+                        num_failures := num_failures + 1;
+                        current_fail := True;
+                        write(failMsg, string'("Failure #") & integer'image(num_failures) & " MsgID: " & integer'image(testcase)); -- & " Operation: ");
                         write(failMsg, string'(" Line: ") & integer'image(line_no) & " Word: " & integer'image(word_count));
                         write(failMsg, " Expected: " & lwc_to_hstring(word_block) & " Received: " & lwc_to_hstring(do_data));
                         if PDI_SHARES > 1 then
                             write(failMsg, " Received sum: " & lwc_to_hstring(do_sum));
                         end if;
                         writeline(failures_file, failMsg);
-                        if num_fails >= G_MAX_FAILURES then
+                        if num_failures >= G_MAX_FAILURES then
                             force_exit := True;
                             exit;
                         end if;
@@ -500,7 +586,13 @@ begin
                     end if;
                     word_count := word_count + 1;
                     if preamble = STT_HEAD then -- last line of this testcase
-                        if G_TEST_MODE = TESTMODE_TIMING then
+                        if current_fail then
+                            report " [FAILED] Testcase #" & integer'image(testcase) & " failed!" severity error;
+                            current_fail := False;
+                        elsif G_VERBOSE_LEVEL > 0 then
+                            report " [OK]" severity note;
+                        end if;
+                        if TIMING_MODE then
                             assert timing_started;
                             cycles         := cycle_counter - start_cycle;
                             timing_stopped <= True;
@@ -513,13 +605,14 @@ begin
                     end if;
                 end loop;               -- end of this line
             elsif preamble = TB_HEAD then
-                testcase := testcase + 1;
+                current_fail := False;
+                testcase     := testcase + 1;
                 lwc_hread(line_data, tb_block, read_ok);
                 if not read_ok then
                     exit;
                 end if;
-                opcode   := tb_block(19 downto 16);
-                msgid    := to_integer(to_01(unsigned(tb_block(7 downto 0))));
+                opcode       := tb_block(19 downto 16);
+                msgid        := to_integer(unsigned(tb_block(7 downto 0)));
                 write(logMsg, "Testcase #" & integer'image(testcase) & " MsgID:" & integer'image(testcase) & " Op:");
                 if (opcode = INST_HASH) then
                     write(logMsg, string'("HASH"));
@@ -531,7 +624,7 @@ begin
                     else
                         write(logMsg, string'("UNKNOWN opcode=") & lwc_to_hstring(opcode));
                     end if;
-                    keyid := to_integer(to_01(unsigned(tb_block(15 downto 8))));
+                    keyid := to_integer(unsigned(tb_block(15 downto 8)));
                     write(logMsg, string'(" KeyID:") & integer'image(keyid));
                 end if;
                 report logMsg.all severity note;
@@ -547,7 +640,7 @@ begin
             report "Number of consumed random words: " & integer'image(num_rand_vectors) severity note;
         end if;
         --
-        if failed then
+        if num_failures > 0 then
             write(logMsg, string'("[FAIL] "));
         else
             write(logMsg, string'("[PASS] "));
@@ -557,12 +650,12 @@ begin
         -- write(logMsg, string'(" Simulation time: ") & time'image(end_time));
         writeline(log_file, logMsg);
         --
-        if G_TEST_MODE = TESTMODE_TIMING then
+        if TIMING_MODE then
             file_close(timing_file);
         end if;
         file_close(log_file);
         --
-        if failed then
+        if num_failures > 0 then
             write(result_file, "1");
             report LF & LF & logMsg.all & LF severity failure;
         else

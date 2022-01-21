@@ -1,4 +1,4 @@
---------------------------------------------------------------------------------
+--===============================================================================================--
 --! @file       LWC.vhd (CAESAR API for Lightweight)
 --!
 --! @brief      LWC top level file
@@ -19,25 +19,29 @@
 --! @note       This is publicly available encryption source code that falls
 --!             under the License Exception TSU (Technology and software-
 --!             unrestricted)
---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------
 --! Description
---!
---!
---!   
---!                               ┌────────────┐
---!                            ┌─►│ HeaderFifo ├──┐
---!          ┌──────────────┐  │  └────────────┘  │  ┌───────────────┐
---!          │              ├──┘                  └─►│               │
---!    PDI──►│              │     ┌────────────┐     │               │
---!          │ PreProcessor ├────►│            │     │ PostProcessor ├─►DO
---!    SDI──►│              │     │ CryptoCore ├────►│               │
---!          │              ├────►│            │     │               │
---!          └──────────────┘     └────────────┘     └───────────────┘
---!       
+--!             TOP-level RTL module of an LWC implementation
 --!
 --!
 --!
---------------------------------------------------------------------------------
+--!
+--!
+--!                               .------------.
+--!                            .->| HeaderFifo |--.
+--!          .--------------.  |  '------------'  |  .---------------.
+--!          |              |--'                  '->|               |
+--!    PDI-->|              |     .------------.     |               |  .----.
+--!          | PreProcessor |---->|            |     | PostProcessor |--|FIFO|->DO
+--!    SDI-->|              |     | CryptoCore |---->|               |  '----'
+--!          |              |---->|            |     |               | optional
+--!          '--------------'     '------------'     '---------------'
+--!
+--!
+--!
+--!
+--===============================================================================================--
+
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -46,6 +50,9 @@ use work.design_pkg.all;
 use work.NIST_LWAPI_pkg.all;
 
 entity LWC is
+    generic(
+        G_DO_FIFO_DEPTH : natural := 0 -- 0: disable output FIFO, 1 or 2 (elastic FIFO)
+    );
     port(
         --! Global ports
         clk       : in  std_logic;
@@ -60,8 +67,8 @@ entity LWC is
         sdi_ready : out std_logic;
         --! Data out ports
         do_data   : out std_logic_vector(PDI_SHARES * W - 1 downto 0);
-        do_ready  : in  std_logic;
         do_valid  : out std_logic;
+        do_ready  : in  std_logic;
         do_last   : out std_logic
     );
 end LWC;
@@ -104,45 +111,51 @@ architecture structure of LWC is
     signal cmd_FIFO_out               : std_logic_vector(W - 1 downto 0);
     signal cmd_valid_FIFO_out         : std_logic;
     signal cmd_ready_FIFO_out         : std_logic;
+    ------! Optional output FIFO
+    signal do_fifo_in_valid           : std_logic;
+    signal do_fifo_in_ready           : std_logic;
+    signal do_fifo_in_data            : std_logic_vector(do_data'length - 1 downto 0);
+    signal do_fifo_in_last            : std_logic;
+    signal do_fifo_in, do_fifo_out    : std_logic_vector(do_data'length downto 0); -- data + last
 
     --============================================ Component Declarations ===========================================--
 
     component CryptoCore
         port(
-            clk             : in  STD_LOGIC;
-            rst             : in  STD_LOGIC;
-            key             : in  STD_LOGIC_VECTOR(SDI_SHARES * CCSW - 1 downto 0);
-            key_update      : in  STD_LOGIC;
-            key_valid       : in  STD_LOGIC;
-            key_ready       : out STD_LOGIC;
-            bdi             : in  STD_LOGIC_VECTOR(PDI_SHARES * CCW - 1 downto 0);
-            bdi_valid       : in  STD_LOGIC;
-            bdi_ready       : out STD_LOGIC;
-            bdi_pad_loc     : in  STD_LOGIC_VECTOR(CCW / 8 - 1 downto 0);
-            bdi_valid_bytes : in  STD_LOGIC_VECTOR(CCW / 8 - 1 downto 0);
-            bdi_size        : in  STD_LOGIC_VECTOR(3 - 1 downto 0);
-            bdi_eot         : in  STD_LOGIC;
-            bdi_eoi         : in  STD_LOGIC;
-            bdi_type        : in  STD_LOGIC_VECTOR(4 - 1 downto 0);
-            decrypt_in      : in  STD_LOGIC;
+            clk             : in  std_logic;
+            rst             : in  std_logic;
+            key             : in  std_logic_vector(SDI_SHARES * CCSW - 1 downto 0);
+            key_update      : in  std_logic;
+            key_valid       : in  std_logic;
+            key_ready       : out std_logic;
+            bdi             : in  std_logic_vector(PDI_SHARES * CCW - 1 downto 0);
+            bdi_valid       : in  std_logic;
+            bdi_ready       : out std_logic;
+            bdi_pad_loc     : in  std_logic_vector(CCW / 8 - 1 downto 0);
+            bdi_valid_bytes : in  std_logic_vector(CCW / 8 - 1 downto 0);
+            bdi_size        : in  std_logic_vector(3 - 1 downto 0);
+            bdi_eot         : in  std_logic;
+            bdi_eoi         : in  std_logic;
+            bdi_type        : in  std_logic_vector(4 - 1 downto 0);
+            decrypt_in      : in  std_logic;
             hash_in         : in  std_logic;
-            bdo             : out STD_LOGIC_VECTOR(PDI_SHARES * CCW - 1 downto 0);
-            bdo_valid       : out STD_LOGIC;
-            bdo_ready       : in  STD_LOGIC;
-            bdo_type        : out STD_LOGIC_VECTOR(4 - 1 downto 0);
-            bdo_valid_bytes : out STD_LOGIC_VECTOR(CCW / 8 - 1 downto 0);
-            end_of_block    : out STD_LOGIC;
-            msg_auth_valid  : out STD_LOGIC;
-            msg_auth_ready  : in  STD_LOGIC;
-            msg_auth        : out STD_LOGIC
+            bdo             : out std_logic_vector(PDI_SHARES * CCW - 1 downto 0);
+            bdo_valid       : out std_logic;
+            bdo_ready       : in  std_logic;
+            bdo_type        : out std_logic_vector(4 - 1 downto 0);
+            bdo_valid_bytes : out std_logic_vector(CCW / 8 - 1 downto 0);
+            end_of_block    : out std_logic;
+            msg_auth_valid  : out std_logic;
+            msg_auth_ready  : in  std_logic;
+            msg_auth        : out std_logic
         );
     end component;
 
 begin
     -- synthesis translate_off
     assert false report "[LWC]" & LF & "  GW=" & integer'image(W) & "  SW=" & --
-        integer'image(SW) & LF & "  CCW=" & integer'image(CCW) & " CCSW=" & integer'image(CCSW) --
-        severity note;
+    integer'image(SW) & LF & "  CCW=" & integer'image(CCW) & " CCSW=" & integer'image(CCSW) --
+    severity note;
     -- synthesis translate_on
 
     -- The following combinations (W, CCW) are supported in the current version
@@ -233,27 +246,27 @@ begin
             clk             => clk,
             rst             => rst,
             bdo_data        => bdo_cipher_out,
-            bdo_valid       => bdo_valid_cipher_out,
-            bdo_ready       => bdo_ready_cipher_out,
+            bdo_valid_bytes => bdo_valid_bytes_cipher_out,
             bdo_last        => end_of_block_cipher_out,
             bdo_type        => bdo_type_cipher_out,
-            bdo_valid_bytes => bdo_valid_bytes_cipher_out,
+            bdo_valid       => bdo_valid_cipher_out,
+            bdo_ready       => bdo_ready_cipher_out,
             auth_success    => msg_auth,
-            auth_ready      => msg_auth_ready,
             auth_valid      => msg_auth_valid,
+            auth_ready      => msg_auth_ready,
             cmd_data        => cmd_FIFO_out,
             cmd_valid       => cmd_valid_FIFO_out,
             cmd_ready       => cmd_ready_FIFO_out,
-            do_data         => do_data,
-            do_valid        => do_valid,
-            do_last         => do_last,
-            do_ready        => do_ready
+            do_data         => do_fifo_in_data,
+            do_last         => do_fifo_in_last,
+            do_valid        => do_fifo_in_valid,
+            do_ready        => do_fifo_in_ready
         );
 
-    Inst_HeaderFifo : entity work.fwft_fifo
+    Inst_HeaderFifo : entity work.FIFO
         generic map(
-            G_W         => W,
-            G_LOG2DEPTH => 2
+            G_W     => W,
+            G_DEPTH => 1
         )
         port map(
             clk        => clk,
@@ -265,5 +278,25 @@ begin
             dout_valid => cmd_valid_FIFO_out,
             dout_ready => cmd_ready_FIFO_out
         );
+
+    Inst_DoutFifo : entity work.FIFO
+        generic map(
+            G_W     => (do_data'length + 1),
+            G_DEPTH => G_DO_FIFO_DEPTH
+        )
+        port map(
+            clk        => clk,
+            rst        => rst,
+            din        => do_fifo_in,
+            din_valid  => do_fifo_in_valid,
+            din_ready  => do_fifo_in_ready,
+            dout       => do_fifo_out,
+            dout_valid => do_valid,
+            dout_ready => do_ready
+        );
+
+    do_fifo_in <= do_fifo_in_last & do_fifo_in_data;
+    do_data    <= do_fifo_out(do_data'length - 1 downto 0);
+    do_last    <= do_fifo_out(do_data'length);
 
 end architecture;

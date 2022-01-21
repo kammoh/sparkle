@@ -107,7 +107,7 @@ package LWC_pkg is
     --! Little Endian: least significant (LSB) portion of the input `a` is assigned to index 0 of the output
     -- function chop_le(a : std_logic_vector; n : positive) return slv_array_t;
 
-    --! concatinates slv_array_t elements into a single std_logic_vector
+    --! concatenates slv_array_t elements into a single std_logic_vector
     -- Big Endian
     -- function concat_be(a : slv_array_t) return std_logic_vector;
 
@@ -161,6 +161,9 @@ package LWC_pkg is
     -- Used in simulation
     procedure lwc_hread(l : inout line; value : out std_logic_vector; good : out boolean);
     function lwc_or_reduce(l : std_logic_vector) return std_logic;
+    function lwc_and_reduce(l : std_logic_vector) return std_logic;
+    function lwc_or_reduce(u : unsigned) return std_logic;
+    function lwc_and_reduce(u : unsigned) return std_logic;
     function lwc_to_hstring(value : std_logic_vector) return string;
 
     --! return n most significant bits of slv
@@ -183,8 +186,8 @@ package LWC_pkg is
             sdi_ready : out std_logic;
             do_data   : out std_logic_vector(PDI_SHARES * W - 1 downto 0);
             do_last   : out std_logic;
-            do_ready  : in  std_logic;
-            do_valid  : out std_logic
+            do_valid  : out std_logic;
+            do_ready  : in  std_logic
         );
     end component;
 
@@ -246,6 +249,21 @@ end LWC_pkg;
 package body LWC_pkg is
 
     --======================================== Functions ========================================--
+    -- function Byte_To_Bits_EXP(
+    --     bytes_in : std_logic_vector
+    -- ) return std_logic_vector is
+
+    --     variable bits : std_logic_vector((8 * bytes_in'length) - 1 downto 0);
+    -- begin
+    --     for i in 0 to bytes_in'length - 1 loop
+    --         if (bytes_in(i) = '1') then
+    --             bits(8 * (i + 1) - 1 downto 8 * i) := (others => '1');
+    --         else
+    --             bits(8 * (i + 1) - 1 downto 8 * i) := (others => '0');
+    --         end if;
+    --     end loop;
+    --     return bits;
+    -- end Byte_To_Bits_EXP;
 
     function clear_invalid_bytes(bdo_data, bdo_valid_bytes : std_logic_vector) return std_logic_vector is
         variable bdo_cleared : std_logic_vector(bdo_data'range) := (others => '0');
@@ -306,7 +324,7 @@ package body LWC_pkg is
     --     return ret;
     -- end function;
 
-    -- --! concatinates slv_array_t elements into a single std_logic_vector
+    -- --! concatenates slv_array_t elements into a single std_logic_vector
     -- -- Big Endian
     -- function concat_be(a : slv_array_t) return std_logic_vector is
     --     constant n    : positive := a'length;
@@ -600,13 +618,13 @@ package body LWC_pkg is
         end loop;
     end procedure;
 
-    function lwc_to_hstring(value : std_logic_VECTOR) return STRING is
+    function lwc_to_hstring(value : std_logic_vector) return STRING is
         constant NUS    : STRING(2 to 1) := (others => ' '); -- null STRING
         constant ne     : INTEGER        := (value'length + 3) / 4;
-        variable pad    : std_logic_VECTOR(0 to (ne * 4 - value'length) - 1);
-        variable ivalue : std_logic_VECTOR(0 to ne * 4 - 1);
+        variable pad    : std_logic_vector(0 to (ne * 4 - value'length) - 1);
+        variable ivalue : std_logic_vector(0 to ne * 4 - 1);
         variable result : STRING(1 to ne);
-        variable quad   : std_logic_VECTOR(0 to 3);
+        variable quad   : std_logic_vector(0 to 3);
     begin
         if value'length < 1 then
             return NUS;
@@ -654,13 +672,33 @@ package body LWC_pkg is
     end procedure;
 
     function lwc_or_reduce(l : std_logic_vector) return std_logic is
-        variable result : STD_LOGIC := '0';
+        variable result : std_logic := '0'; -- return 0 on input with empty range
     begin
         for i in l'reverse_range loop
-            result := (l(i) or result);
+            result := l(i) or result;
         end loop;
         return result;
     end function;
+
+    function lwc_and_reduce(l : std_logic_vector) return std_logic is
+        variable result : std_logic := '1'; -- return 1 on input with empty range
+    begin
+        for i in l'reverse_range loop
+            result := l(i) and result;
+        end loop;
+        return result;
+    end function;
+
+    function lwc_or_reduce(u : unsigned) return std_logic is
+    begin
+        return lwc_or_reduce(std_logic_vector(u));
+    end function;
+
+    function lwc_and_reduce(u : unsigned) return std_logic is
+    begin
+        return lwc_and_reduce(std_logic_vector(u));
+    end function;
+
 
     -- function lwc_to_string(slv : std_logic_vector) return STRING is
     --     type sl_map_type is array (std_logic) of character;

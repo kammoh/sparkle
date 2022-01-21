@@ -18,29 +18,14 @@ package util_pkg is
 
   --=================================================================================================================--
   --
-  function log2ceil(n : positive) return natural;
-  --
   function to_uint32_array(a : t_slv_array) return t_uint32_array;
   --
   -- convert uint32_array_t to std_logic_vector(31 downto 0)
   function to_slva(a : t_uint32_array) return t_slv_array;
   --
-  -- convert boolean to std_logic
-  function to_sl(a : boolean) return std_logic;
 end package;
 
 package body util_pkg is
-  function log2ceil(n : positive) return natural is
-    variable pow2 : positive := 1;
-    variable r    : natural  := 0;
-  begin
-    while n > pow2 loop
-      pow2 := pow2 * 2;
-      r    := r + 1;
-    end loop;
-    return r;
-  end function;
-
   function to_uint32_array(a : t_slv_array) return t_uint32_array is
     variable ret : t_uint32_array(a'range);
   begin
@@ -60,12 +45,4 @@ package body util_pkg is
     return ret;
   end function;
 
-  function to_sl(a : boolean) return std_logic is
-  begin
-    if a then
-      return '1';
-    else
-      return '0';
-    end if;
-  end function;
 end package body;

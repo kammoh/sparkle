@@ -10,6 +10,7 @@ use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
 use IEEE.numeric_std_unsigned.all;
 
+use work.LWC_pkg.all;
 use work.util_pkg.all;
 
 entity sparkle is
@@ -29,15 +30,16 @@ entity sparkle is
     --
     key_update           : in  std_logic; --- ???
     --
-    bdi_bits_word        : in  std_logic_vector(IO_WIDTH - 1 downto 0);
-    bdi_bits_last        : in  std_logic;
-    bdi_bits_valid_bytes : in  std_logic_vector(IO_WIDTH / 8 - 1 downto 0);
-    bdi_bits_ad          : in  std_logic;
-    bdi_bits_ct          : in  std_logic;
-    bdi_bits_hm          : in  std_logic;
-    bdi_bits_eoi         : in  std_logic;
+    bdi                  : in  std_logic_vector(IO_WIDTH - 1 downto 0);
+    bdi_last             : in  std_logic;
+    bdi_validbytes       : in  std_logic_vector(IO_WIDTH / 8 - 1 downto 0);
+    bdi_type             : in  std_logic_vector(3 downto 0);
+    bdi_eoi              : in  std_logic;
     bdi_valid            : in  std_logic;
     bdi_ready            : out std_logic;
+    --
+    decrypt_op           : in  std_logic;
+    hash_op              : in  std_logic;
     --
     bdo_bits_word        : out std_logic_vector(IO_WIDTH - 1 downto 0);
     bdo_bits_last        : out std_logic;
@@ -212,11 +214,12 @@ architecture RTL of sparkle is
   end procedure;
 
   --============================================ Registers ==========================================================--
-  signal sparkle_state                                                        : sparkle_state_t;
-  signal inbuf_bytevalids                                                     : rate_bytevalid_t;
-  signal step_cnt                                                             : step_t;
-  signal state, post_perm_state                                               : fsm_state_t;
-  signal perm_slim_steps, inbuf_ct, inbuf_hm, inbuf_ad, inbuf_eoi, outbuf_tag : boolean;
+  signal sparkle_state                                            : sparkle_state_t;
+  signal inbuf_validbytes                                         : rate_bytevalid_t;
+  signal step_cnt                                                 : step_t;
+  signal state, post_perm_state                                   : fsm_state_t;
+  signal perm_slim_steps, inbuf_ct, inbuf_hm, inbuf_ad, inbuf_eoi : boolean;
+  signal outbuf_tag, outbuf_tagverif                              : boolean;
 
   --============================================== Wires ============================================================--
   signal keybuf_slva                           : t_slv_array(0 to KEY_WORDS - 1)(IO_WIDTH - 1 downto 0);
@@ -230,7 +233,8 @@ architecture RTL of sparkle is
   signal inbuf_valid_words, outbuf_valid_words : t_bit_array(0 to RATE_WORDS - 1);
   signal keybuf_valid, keybuf_ready            : std_logic;
   signal outbuf_valid, outbuf_ready            : std_logic;
-  signal inbuf_last, inbuf_incomp, outbuf_last : std_logic;
+  signal inbuf_last, inbuf_incomp              : std_logic;
+  signal outbuf_last                           : std_logic;
 begin
   --============================================ Submodules =========================================================--
   INBUF_SIPO : entity work.SIPO
@@ -246,13 +250,13 @@ begin
       clk                  => clk,
       reset                => reset,
       in_bits_word         => input_word,
-      in_bits_last         => bdi_bits_last,
-      in_bits_valid_bytes  => bdi_bits_valid_bytes,
+      in_bits_last         => bdi_last,
+      in_bits_valid_bytes  => bdi_validbytes,
       in_valid             => bdi_valid,
       in_ready             => bdi_ready,
       out_bits_block       => inbuf_slva,
       out_bits_valid_words => inbuf_valid_words,
-      out_bits_bva         => inbuf_bytevalids,
+      out_bits_bva         => inbuf_validbytes,
       out_bits_last        => inbuf_last,
       out_bits_incomp      => inbuf_incomp,
       out_valid            => inbuf_valid,
@@ -296,7 +300,7 @@ begin
       reset                => reset,
       in_bits_block        => outbuf_slva,
       in_bits_valid_words  => outbuf_valid_words,
-      in_bits_valid_bytes  => inbuf_bytevalids, -- for TAG and DIGEST we ignore out_bits_valid_bytes
+      in_bits_valid_bytes  => inbuf_validbytes, -- for TAG and DIGEST we ignore out_bits_valid_bytes
       in_bits_last         => outbuf_last,
       in_valid             => outbuf_valid,
       in_ready             => outbuf_ready,
@@ -311,9 +315,9 @@ begin
   keybuf               <= to_uint32_array(keybuf_slva);
   inbuf                <= to_uint32_array(inbuf_slva);
   outbuf_slva          <= to_slva(outbuf);
-  input_word           <= padword(bdi_bits_word, bdi_bits_valid_bytes, TRUE);
+  input_word           <= padword(bdi, bdi_validbytes, TRUE);
   --
-  bdo_bits_tag         <= to_sl(outbuf_tag);
+  bdo_bits_tag         <= to_std_logic(outbuf_tagverif);
   bdo_bits_valid_bytes <= (others => '1') when outbuf_tag else output_validbytes;
   bdo_bits_word        <= padword(output_word, bdo_bits_valid_bytes, FALSE);
 
@@ -325,7 +329,7 @@ begin
     variable tmp_state  : sparkle_state_t;
   begin
     rho_whi(
-      inbuf_ct, inbuf_ad, inbuf_last = '1', inbuf_incomp = '1', inbuf, inbuf_bytevalids, sparkle_state,
+      inbuf_ct, inbuf_ad, inbuf_last = '1', inbuf_incomp = '1', inbuf, inbuf_validbytes, sparkle_state,
       tmp_outbuf, tmp_state
     );
     for i in 0 to TAG_WORDS - 1 loop
@@ -339,12 +343,12 @@ begin
     keybuf_ready       <= '0';
     outbuf_valid       <= '0';
     case state is
-      when INIT =>
+      when INIT =>                      -- load npub and optionally key
         inbuf_ready  <= keybuf_valid and not key_update;
         keybuf_ready <= key_update;     -- ???
       when PROCESS_TEXT =>
-        inbuf_ready  <= to_sl(inbuf_ad) or outbuf_ready;
-        outbuf_valid <= not to_sl(inbuf_ad) and inbuf_valid;
+        inbuf_ready  <= to_std_logic(inbuf_ad) or outbuf_ready;
+        outbuf_valid <= not to_std_logic(inbuf_ad) and inbuf_valid;
       when PERMUTE =>
         null;
       when FINALIZE_TAG =>
@@ -360,13 +364,14 @@ begin
     if rising_edge(clk) then
       -- keep value of these flags associated with the last received bdi word
       if bdi_valid = '1' and bdi_ready = '1' then
-        inbuf_ad  <= bdi_bits_ad = '1';
-        inbuf_ct  <= bdi_bits_ct = '1';
-        inbuf_hm  <= bdi_bits_hm = '1';
-        inbuf_eoi <= bdi_bits_eoi = '1';
+        inbuf_ad  <= bdi_type = HDR_AD;
+        inbuf_eoi <= bdi_eoi = '1';
       end if;
     end if;
   end process;
+
+  inbuf_hm <= hash_op = '1';
+  inbuf_ct <= decrypt_op = '1' and not inbuf_ad;
 
   REG_PROC : process(clk)
   begin
@@ -374,9 +379,6 @@ begin
       if reset = '1' then
         state <= INIT;
       else
-        if outbuf_ready = '1' then      -- outbuf is empty (or will be)
-          outbuf_tag <= FALSE;          -- overriden in FINALIZE_TAG
-        end if;
         case state is
           when INIT =>
             if inbuf_valid = '1' and inbuf_ready = '1' then -- implies keybuf_valid = '1'
@@ -400,10 +402,15 @@ begin
               state           <= PERMUTE;
               post_perm_state <= state when inbuf_last = '0' or (inbuf_ad and not inbuf_eoi) else FINALIZE_TAG;
             end if;
+            if outbuf_valid and outbuf_ready then -- outbuf is empty (or will be)
+              outbuf_tag      <= FALSE; -- overriden in FINALIZE_TAG
+              outbuf_tagverif <= FALSE; -- overriden in FINALIZE_TAG
+            end if;
           when FINALIZE_TAG =>
             if outbuf_ready = '1' then
-              outbuf_tag <= TRUE;
-              state      <= INIT;
+              outbuf_tag      <= TRUE;
+              outbuf_tagverif <= decrypt_op = '1';
+              state           <= INIT;
             end if;
         end case;
       end if;

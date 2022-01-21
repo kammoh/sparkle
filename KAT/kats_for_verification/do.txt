@@ -101,6 +101,7 @@ HDR = 43000002
 DAT = 1EFD0000
 # Status: Success
 STT = E0000000
+####EOF
 
 #### Authenticated Encryption
 #### MsgID=7, KeyID=7, AD Size=0, PT Size=3
