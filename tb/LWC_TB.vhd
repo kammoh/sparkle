@@ -103,14 +103,14 @@ architecture TB of LWC_TB is
     -- Counters
     signal pdi_operation_count : integer                             := 0;
     signal cycle_counter       : natural                             := 0;
-    signal watchdog_counter    : natural                             := 0;
+    signal idle_counter    : natural                             := 0;
     signal num_rand_vectors    : natural                             := 0;
     --
     signal start_cycle         : natural;
     signal timing_started      : boolean                             := False;
     signal timing_stopped      : boolean                             := False;
     -- random number generation (requires VHDL 2000+)
-    -- from from VHDL-extras (http://github.com/kevinpt/vhdl-extras)
+    -- based on random package from VHDL-extras (http://github.com/kevinpt/vhdl-extras)
     use ieee.math_real.all;
     type rand_state is protected
         procedure seed(s : in positive);
@@ -135,6 +135,7 @@ architecture TB of LWC_TB is
             return result;
         end function;
     end protected body;
+    --
     shared variable prng       : rand_state;
     --
     impure function random return real is
@@ -145,21 +146,15 @@ architecture TB of LWC_TB is
     begin
         prng.seed(s);
     end procedure;
-    -- End VHDL 2000+
-    --
+    ----- End VHDL 2000+
+    -----
     impure function random(min, max : integer) return integer is
     begin
         return integer(trunc(real(max - min + 1) * random)) + min;
     end function;
-
-    impure function random return boolean is
-    begin
-        return random(0, 1) = 1;
-    end function;
-
+    --
     impure function random(size : natural) return std_logic_vector is
-        -- Populate vector in 30-bit chunks to avoid exceeding the
-        -- range of integer
+        -- 30-bit chunks to stay within integer range limit
         constant seg_size  : natural := 30;
         constant segments  : natural := size / seg_size;
         constant remainder : natural := size - segments * seg_size;
@@ -280,11 +275,11 @@ begin
         if G_TIMEOUT_CYCLES > 0 and reset_done and rising_edge(clk) then
             if (pdi_valid and pdi_ready) = '1' --
                 or (sdi_valid and sdi_ready) = '1' or (do_valid and do_ready) = '1' then
-                watchdog_counter <= 0;
+                idle_counter <= 0;
             else
-                watchdog_counter <= watchdog_counter + 1;
-                assert watchdog_counter < G_TIMEOUT_CYCLES --
-                report "[FAIL] Timeout after " & integer'image(watchdog_counter) & " cycles!"
+                idle_counter <= idle_counter + 1;
+                assert idle_counter < G_TIMEOUT_CYCLES --
+                report "[FAIL] Timeout after " & integer'image(idle_counter) & " cycles!"
                 severity failure;
             end if;
         end if;
@@ -496,7 +491,7 @@ begin
         variable logMsg       : LINE;
         variable failMsg      : LINE;
         variable tb_block     : std_logic_vector(20 - 1 downto 0);
-        variable word_block   : std_logic_vector(W - 1 downto 0);
+        variable golden_word   : std_logic_vector(W - 1 downto 0);
         variable read_ok      : boolean;
         variable preamble     : string(1 to 6);
         variable word_count   : integer := 1;
@@ -543,7 +538,8 @@ begin
                 exit;
             elsif preamble = HDR_HEAD or preamble = DAT_HEAD or preamble = STT_HEAD then -- header, data, or status lines
                 loop                    -- processing single line
-                    lwc_hread(line_data, word_block, read_ok); -- read the rest of the line to word_block
+                    lwc_hread(line_data, golden_word, read_ok); -- read the rest of the line to word_block
+                    word_count := 1;
                     if not read_ok then
                         exit;
                     end if;
@@ -561,27 +557,24 @@ begin
                     wait until rising_edge(clk) and do_valid = '1';
                     assert preamble /= STT_HEAD or do_last = '1' report "Status word received, but do_last was not '1'" severity error;
                     do_sum   := xor_shares(do_data, PDI_SHARES);
-                    if not words_match(do_sum, word_block) then
-                        write(logMsg, string'("[Error]  " & " Msg ID #") & integer'image(msgid) & string'(" failed at line #") & integer'image(line_no) & string'(" word #") & integer'image(word_count));
+                    if not words_match(do_sum, golden_word) then
+                        write(failMsg, string'("Test #") &  integer'image(testcase) & " MsgID: " & integer'image(msgid) & " Line: " & integer'image(line_no) & " Word: " & integer'image(word_count));
+                        write(failMsg, string'(" Expected: ") & lwc_to_hstring(golden_word) & "   Received: " & lwc_to_hstring(do_data));
+                        if PDI_SHARES > 1 then
+                            write(failMsg, "   Received sum: " & lwc_to_hstring(do_sum));
+                        end if;
+                        write(logMsg, string'("[Error] ") & failMsg.all);
+                        report LF & logMsg.all & LF severity error;
                         writeline(log_file, logMsg);
-                        write(logMsg, string'("     Expected: ") & lwc_to_hstring(word_block) & string'(" Received: ") & lwc_to_hstring(do_sum));
-                        report logMsg.all severity error;
-                        writeline(log_file, logMsg);
+                        writeline(failures_file, failMsg);
                         num_failures := num_failures + 1;
                         current_fail := True;
-                        write(failMsg, string'("Failure #") & integer'image(num_failures) & " MsgID: " & integer'image(testcase)); -- & " Operation: ");
-                        write(failMsg, string'(" Line: ") & integer'image(line_no) & " Word: " & integer'image(word_count));
-                        write(failMsg, " Expected: " & lwc_to_hstring(word_block) & " Received: " & lwc_to_hstring(do_data));
-                        if PDI_SHARES > 1 then
-                            write(failMsg, " Received sum: " & lwc_to_hstring(do_sum));
-                        end if;
-                        writeline(failures_file, failMsg);
                         if num_failures >= G_MAX_FAILURES then
                             force_exit := True;
                             exit;
                         end if;
                     else
-                        write(logMsg, string'("[Log]     Expected: ") & lwc_to_hstring(word_block) & string'(" Received: ") & lwc_to_hstring(do_data) & string'(" Matched!"));
+                        write(logMsg, string'("[Log]     Expected: ") & lwc_to_hstring(golden_word) & string'(" Received: ") & lwc_to_hstring(do_data) & string'(" Matched!"));
                         writeline(log_file, logMsg);
                     end if;
                     word_count := word_count + 1;

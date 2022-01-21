@@ -333,7 +333,7 @@ begin
     -- process(all)
     process(state, pdi_valid, pdi_fire, sdi_hdr_opcode, sdi_valid, sdi_fire, key_ready_p, --
         last_flit_of_segment, cmd_ready, bdi_ready_p, reading_pdi_hdr, reading_sdi_hdr, --
-        seglen_is_zero, hdr_first, hdr_last, op_is_actkey,
+        seglen_is_zero, hdr_first, hdr_last, op_is_actkey, last_flag, hash_op, cur_hdr_last,
         relay_hdr_to_postproc
         )
     begin
