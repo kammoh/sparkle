@@ -33,12 +33,13 @@ entity LWC_TB IS
         G_SDI_STALLS       : integer := 3; --! Number of cycles to stall sdi_valid
         G_DO_STALLS        : integer := 3; --! Number of cycles to stall do_ready
         G_RDI_STALLS       : integer := 3; --! Number of cycles to stall rdi_valid
-        G_RANDOM_STALL     : boolean := FALSE; --! Randomized stalls
+        G_RANDOM_STALL     : boolean := false; --! Randomized stalls
         G_RANDOM_SEED      : integer := 1; --! Seed used for all random generation, must be positive
         G_CLK_PERIOD_PS    : integer := 10_000; --! Simulation clock period in picoseconds
         G_FNAME_PDI        : string  := "../KAT/v1/pdi.txt"; --! Path to the input file containing cryptotvgen PDI testvector data
         G_FNAME_SDI        : string  := "../KAT/v1/sdi.txt"; --! Path to the input file containing cryptotvgen SDI testvector data
         G_FNAME_RDI        : string  := "../KAT/v1/rdi.txt"; --! Path to the input file containing random data
+        G_PRNG_RDI         : boolean := false; -- use testbench PRNG to generate RDI input instead of the file `G_FNAME_RDI`
         G_FNAME_DO         : string  := "../KAT/v1/do.txt"; --! Path to the input file containing cryptotvgen DO testvector data
         G_FNAME_LOG        : string  := "log.txt"; --! Path to the generated log file
         G_FNAME_TIMING     : string  := "timing.txt"; --! Path to the generated timing measurements (when G_TEST_MODE=4)
@@ -103,7 +104,7 @@ architecture TB of LWC_TB is
     -- Counters
     signal pdi_operation_count : integer                             := 0;
     signal cycle_counter       : natural                             := 0;
-    signal idle_counter    : natural                             := 0;
+    signal idle_counter        : natural                             := 0;
     signal num_rand_vectors    : natural                             := 0;
     --
     signal start_cycle         : natural;
@@ -146,8 +147,8 @@ architecture TB of LWC_TB is
     begin
         prng.seed(s);
     end procedure;
-    ----- End VHDL 2000+
-    -----
+    ----- End VHDL 2000+ -----
+    --
     impure function random(min, max : integer) return integer is
     begin
         return integer(trunc(real(max - min + 1) * random)) + min;
@@ -286,7 +287,11 @@ begin
     end process;
 
     --===========================================================================================--
-    -- LWC is instantiated as a component for mixed languages simulation
+    -- LWC is instantiated as a component to enable mixed language simulation
+    --*** SCA ***--
+    --/+
+    -- uut : LWC_SCA
+    --/-
     uut : LWC
         port map(
             clk       => clk,
@@ -301,11 +306,12 @@ begin
             do_last   => do_last,
             do_valid  => do_valid,
             do_ready  => do_ready_delayed
-            -- LWC_SCA:
-            -- , rdi_data  => rdi_data_delayed,
+            --/+++
+            -- , rdi_data => rdi_delayed,
             -- rdi_valid => rdi_valid_delayed,
             -- rdi_ready => rdi_ready
         );
+    --***********--
 
     --===========================================================================================--
 
@@ -326,23 +332,26 @@ begin
         begin
             report LF & "RW=" & integer'image(RW);
             wait until reset_done and rising_edge(clk);
-            if G_FNAME_RDI'length < 1 then
-                loop
+            if G_PRNG_RDI then
+                while not stop_clock loop
                     for i in 0 to get_stalls(G_RDI_STALLS) - 1 loop
                         rdi_valid <= '0';
                         wait until rising_edge(clk);
                     end loop;
-                    rdi_data  <= random(RW);
-                    rdi_valid <= '1';
+                    rdi_data         <= random(RW);
+                    rdi_valid        <= '1';
                     wait until rising_edge(clk) and rdi_ready = '1' and rdi_valid_delayed = '1';
+                    num_rand_vectors <= num_rand_vectors + 1;
                 end loop;
             else
                 file_open(rdi_file, G_FNAME_RDI, READ_MODE);
-                loop
+                while not stop_clock loop
                     loop
                         if endfile(rdi_file) then
                             assert num_rand_vectors > 0 report "RDI file is empty!" severity failure;
-                            -- report "Reached end of " & G_FNAME_RDI & ", reading from the begining.";
+                            if G_VERBOSE_LEVEL > 2 then
+                                report "Reached end of " & G_FNAME_RDI & ", reading from the begining.";
+                            end if;
                             -- re-read from the biginging
                             file_close(rdi_file);
                             file_open(rdi_file, G_FNAME_RDI, READ_MODE);
@@ -452,7 +461,7 @@ begin
     begin
         wait until reset_done;
         wait until rising_edge(clk);
-        if G_FNAME_SDI'length > 0 then  -- set G_FNAME_SDI = "" if sdi is not used (i.e., hash)
+        if TRUE then                    -- set to FALSE if sdi is not used (i.e., hash)
             file_open(sdi_file, G_FNAME_SDI, READ_MODE);
 
             while not endfile(sdi_file) loop
@@ -491,7 +500,7 @@ begin
         variable logMsg       : LINE;
         variable failMsg      : LINE;
         variable tb_block     : std_logic_vector(20 - 1 downto 0);
-        variable golden_word   : std_logic_vector(W - 1 downto 0);
+        variable golden_word  : std_logic_vector(W - 1 downto 0);
         variable read_ok      : boolean;
         variable preamble     : string(1 to 6);
         variable word_count   : integer := 1;
@@ -553,12 +562,12 @@ begin
                         timing_stopped <= False;
                         wait until timing_started;
                     end if;
-                    do_ready <= '1';
+                    do_ready   <= '1';
                     wait until rising_edge(clk) and do_valid = '1';
                     assert preamble /= STT_HEAD or do_last = '1' report "Status word received, but do_last was not '1'" severity error;
-                    do_sum   := xor_shares(do_data, PDI_SHARES);
+                    do_sum     := xor_shares(do_data, PDI_SHARES);
                     if not words_match(do_sum, golden_word) then
-                        write(failMsg, string'("Test #") &  integer'image(testcase) & " MsgID: " & integer'image(msgid) & " Line: " & integer'image(line_no) & " Word: " & integer'image(word_count));
+                        write(failMsg, string'("Test #") & integer'image(testcase) & " MsgID: " & integer'image(msgid) & " Line: " & integer'image(line_no) & " Word: " & integer'image(word_count));
                         write(failMsg, string'(" Expected: ") & lwc_to_hstring(golden_word) & "   Received: " & lwc_to_hstring(do_data));
                         if PDI_SHARES > 1 then
                             write(failMsg, "   Received sum: " & lwc_to_hstring(do_sum));

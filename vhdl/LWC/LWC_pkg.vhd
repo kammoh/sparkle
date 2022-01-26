@@ -41,59 +41,14 @@ package LWC_pkg is
 
     --===========================================================================================--
     --=                         DO NOT CHANGE ANYTHING BELOW!                                   =--
-    --=   User configurable parameters are in 'NIST_LWAPI_pkg.vhd' and 'design_pkg.vhd'         =--
+    --=   User configurable parameters are in 'lwc_config.vhd' and 'design_pkg.vhd'         =--
     --===========================================================================================--
 
     --========================================== Types ==========================================--
 
-    subtype T_LWC_SEGMENT is std_logic_vector(3 downto 0);
-    subtype T_LWC_OPCODE is std_logic_vector(3 downto 0);
-
     -- VHDL 2008+
     -- type bit_array_t is array (natural range <>) of std_logic;
     -- type slv_array_t is array (natural range <>) of std_logic_vector;
-
-    --======================================== Constants ========================================--
-
-    constant Wdiv8  : integer := W / 8;
-    constant SWdiv8 : integer := SW / 8;
-
-    --! INSTRUCTIONS (OPCODES)
-    constant INST_HASH      : T_LWC_OPCODE  := "1000";
-    constant INST_ENC       : T_LWC_OPCODE  := "0010";
-    constant INST_DEC       : T_LWC_OPCODE  := "0011";
-    constant INST_LDKEY     : T_LWC_OPCODE  := "0100";
-    constant INST_ACTKEY    : T_LWC_OPCODE  := "0111";
-    constant INST_SUCCESS   : T_LWC_OPCODE  := "1110";
-    constant INST_FAILURE   : T_LWC_OPCODE  := "1111";
-    --! SEGMENT TYPE ENCODING
-    --! Reserved := "0000";
-    constant HDR_AD         : T_LWC_SEGMENT := "0001";
-    constant HDR_NPUB_AD    : T_LWC_SEGMENT := "0010";
-    constant HDR_AD_NPUB    : T_LWC_SEGMENT := "0011";
-    constant HDR_PT         : T_LWC_SEGMENT := "0100";
-    constant HDR_CT         : T_LWC_SEGMENT := "0101";
-    constant HDR_CT_TAG     : T_LWC_SEGMENT := "0110";
-    constant HDR_HASH_MSG   : T_LWC_SEGMENT := "0111";
-    constant HDR_TAG        : T_LWC_SEGMENT := "1000";
-    constant HDR_HASH_VALUE : T_LWC_SEGMENT := "1001";
-    constant HDR_LENGTH     : T_LWC_SEGMENT := "1010";
-    constant HDR_KEY        : T_LWC_SEGMENT := "1100";
-    constant HDR_NPUB       : T_LWC_SEGMENT := "1101";
-    --! Reserved := "1011";
-    --NOT USED in NIST LWC
-    constant HDR_NSEC       : T_LWC_SEGMENT := "1110";
-    --NOT USED in NIST LWC
-    constant HDR_ENSEC      : T_LWC_SEGMENT := "1111";
-    --! Maximum supported length
-    --! Length of segment header
-    -- constant SINGLE_PASS_MAX : integer                      := 16;
-    -- --! Length of segment header
-    -- constant TWO_PASS_MAX    : integer                      := 16;
-
-    -- --! Other
-    -- --! Limit to the segment counter size
-    -- constant CTR_SIZE_LIM : integer := 16;
 
     --======================================== Functions ========================================--
 
@@ -125,7 +80,8 @@ package LWC_pkg is
 
     --! Returns the number of bits required to represet positive integers strictly less than `n` (0 to n - 1 inclusive)
     --! Output is equal to ceil(log2(n))
-    function log2ceil(n : positive) return natural;
+    --! log2ceil(0) -> 0
+    function log2ceil(n : natural) return natural;
 
     --! convert boolean to std_logic
     function to_std_logic(a : boolean) return std_logic;
@@ -287,7 +243,7 @@ package body LWC_pkg is
     end function;
 
     --! Returns the number of bits required to represet values less than n (0 to n - 1 inclusive)
-    function log2ceil(n : positive) return natural is
+    function log2ceil(n : natural) return natural is
         variable pow2 : positive := 1;
         variable r    : natural  := 0;
     begin
