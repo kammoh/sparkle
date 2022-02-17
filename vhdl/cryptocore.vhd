@@ -4,7 +4,6 @@ use IEEE.numeric_std.all;
 
 use work.design_pkg.all;
 use work.NIST_LWAPI_pkg.all;
-use work.LWC_pkg.all;
 use work.util_pkg.all;
 
 entity cryptocore is

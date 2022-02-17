@@ -1,11 +1,10 @@
-name = "sparkle_lwc"
+name = "sparkle_vhdl"
 
 [language]
 vhdl.standard = "2008"
 
 [rtl]
 sources = [
-    "vhdl/LWC/LWC_pkg.vhd",
     "vhdl/util_pkg.vhdl",
     "vhdl/sipo.vhdl",
     "vhdl/piso.vhdl",
@@ -32,7 +31,7 @@ top = "LWC_TB"
 generics.G_FNAME_PDI.file = "KAT/kats_for_verification/pdi.txt"
 generics.G_FNAME_SDI.file = "KAT/kats_for_verification/sdi.txt"
 generics.G_FNAME_DO.file = "KAT/kats_for_verification/do.txt"
-generics.G_TEST_MODE = 4                                        # 1: stall both inputs and output, 4: timing measurement
+generics.G_TEST_MODE = 1                                       # 1: stall both inputs and output, 4: timing measurement
 generics.G_RANDOM_STALL = true
 generics.G_MAX_FAILURES = 0
 generics.G_TIMEOUT_CYCLES = 100

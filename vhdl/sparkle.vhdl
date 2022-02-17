@@ -11,7 +11,6 @@ use IEEE.numeric_std.all;
 use IEEE.numeric_std_unsigned.all;
 
 use work.NIST_LWAPI_pkg.all;
-use work.LWC_pkg.all;
 use work.util_pkg.all;
 
 entity sparkle is
