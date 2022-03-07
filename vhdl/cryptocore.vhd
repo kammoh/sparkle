@@ -10,12 +10,12 @@ entity cryptocore is
   port(
     clk             : in  std_logic;
     rst             : in  std_logic;
-    ----!key----------------------------------------------------
+    --! Key
     key             : in  std_logic_vector(CCW - 1 downto 0);
     key_valid       : in  std_logic;
     key_ready       : out std_logic;
     key_update      : in  std_logic;
-    ----!Data----------------------------------------------------
+    --! Data Input
     bdi             : in  std_logic_vector(CCW - 1 downto 0);
     bdi_valid       : in  std_logic;
     bdi_ready       : out std_logic;
@@ -27,7 +27,7 @@ entity cryptocore is
     bdi_type        : in  std_logic_vector(4 - 1 downto 0);
     decrypt_in      : in  std_logic;
     hash_in         : in  std_logic;
-    --!Post Processor=========================================
+    --! Data Output
     bdo             : out std_logic_vector(CCW - 1 downto 0);
     bdo_valid       : out std_logic;
     bdo_ready       : in  std_logic;
@@ -72,7 +72,7 @@ begin
     port map(
       clk                  => clk,
       reset                => rst,
-      key_bits             => cc2_key_word,
+      key             => cc2_key_word,
       key_valid            => cc2_key_valid,
       key_ready            => cc2_key_ready,
       key_update           => cc2_key_update,

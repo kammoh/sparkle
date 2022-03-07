@@ -22,7 +22,7 @@ entity sparkle is
     clk             : in  std_logic;
     reset           : in  std_logic;
     --
-    key_bits        : in  std_logic_vector(IO_WIDTH - 1 downto 0);
+    key             : in  std_logic_vector(IO_WIDTH - 1 downto 0);
     key_valid       : in  std_logic;
     key_ready       : out std_logic;
     --
@@ -60,22 +60,22 @@ architecture RTL of sparkle is
   constant AEAD_RATE_WORDS    : positive := 256 / 32;
   constant MAX_RATE_WORDS     : positive := maximum(HASH_RATE_WORDS, AEAD_RATE_WORDS);
   constant AEAD_CAP_WORDS     : positive := STATE_WORDS - AEAD_RATE_WORDS;
-  constant SPARKLE_STEPS_BIG  : positive := 11; -- 10, 11, 12
-  constant SPARKLE_STEPS_SLIM : positive := 7; -- 8 for Sparkle512, o/w 7
+  constant SPARKLE_STEPS_BIG  : positive := 11; --! 10, 11, 12
+  constant SPARKLE_STEPS_SLIM : positive := 7; --! 8 for Sparkle512, otherwise 7
 
-  subtype rate_bytevalid_t is t_slv_array(0 to MAX_RATE_WORDS - 1)(3 downto 0);
-  subtype rate_buffer_t is t_uint32_array(0 to MAX_RATE_WORDS - 1);
-  subtype key_buffer_t is t_uint32_array(0 to KEY_WORDS - 1);
-  subtype sparkle_state_t is t_uint32_array(0 to STATE_WORDS - 1);
-  subtype step_t is unsigned(log2ceil(SPARKLE_STEPS_BIG) - 1 downto 0);
+  subtype t_rate_bytevalid is t_slv_array(0 to MAX_RATE_WORDS - 1)(3 downto 0);
+  subtype t_rate_buffer is t_uint32_array(0 to MAX_RATE_WORDS - 1);
+  subtype t_key_buffer is t_uint32_array(0 to KEY_WORDS - 1);
+  subtype t_sparkle_state is t_uint32_array(0 to STATE_WORDS - 1);
+  subtype t_step_counter is unsigned(log2ceil(SPARKLE_STEPS_BIG) - 1 downto 0);
 
-  type fsm_state_t is (S_INIT, S_PERMUTE, S_PROCESS_TEXT, S_TAG, S_DIGEST);
-  type rcon_t is array (0 to 7) of t_uint32;
+  type t_fsm is (S_INIT, S_PERMUTE, S_PROCESS_TEXT, S_TAG, S_DIGEST);
+  type t_rcon is array (0 to 7) of t_uint32;
 
-  constant RCON : rcon_t := (
+  constant ROUND_CONSTANTS : t_rcon := (
     X"B7E15162", X"BF715880", X"38B4DA56", X"324E7738",
     X"BB1185EB", X"4F7C7B57", X"CFBFA1C8", X"C2B3293D"
-  );
+  );                                    --! round constants
 
   --======================================= Functions/Procedures ====================================================--
   procedure arxbox1(r1, r2 : in natural range 0 to 31; c : in t_uint32; x, y : inout t_uint32) is
@@ -98,7 +98,7 @@ architecture RTL of sparkle is
     return rotate_right(x xor shift_left(x, 16), 16);
   end function;
 
-  procedure linear_layer(state : inout sparkle_state_t) is
+  procedure linear_layer(state : inout t_sparkle_state) is
     variable tmpx, tmpy, x0, y0 : t_uint32;
   begin
     tmpx                   := state(0);
@@ -123,14 +123,14 @@ architecture RTL of sparkle is
     state(STATE_BRANS + 1) := y0;
   end procedure;
 
-  function sparkle_step(state : sparkle_state_t; step : step_t) return sparkle_state_t is
+  function sparkle_step(state : t_sparkle_state; step : t_step_counter) return t_sparkle_state is
     constant sw : positive        := step'length;
-    variable t  : sparkle_state_t := state;
+    variable t  : t_sparkle_state := state;
   begin
-    t(1)                  := t(1) xor RCON(to_integer(step(2 downto 0)));
+    t(1)                  := t(1) xor ROUND_CONSTANTS(to_integer(step(2 downto 0)));
     t(3)(sw - 1 downto 0) := t(3)(sw - 1 downto 0) xor step;
-    for i in 0 to STATE_BRANS - 1 loop
-      alzette(RCON(i), t(2 * i), t(2 * i + 1));
+    for i in 0 to t'length / 2 - 1 loop
+      alzette(ROUND_CONSTANTS(i), t(2 * i), t(2 * i + 1));
     end loop;
     linear_layer(t);
     return t;
@@ -169,16 +169,16 @@ architecture RTL of sparkle is
                               hm              : in boolean;
                               last_block      : in std_logic;
                               incomplete      : in std_logic;
-                              inbuf           : in rate_buffer_t;
-                              inbuf_bytevalid : in rate_bytevalid_t;
-                              instate         : in sparkle_state_t;
-                              outbuf          : out rate_buffer_t;
-                              outstate        : out sparkle_state_t) is
-    variable in_xor_state             : rate_buffer_t;
+                              inbuf           : in t_rate_buffer;
+                              inbuf_bytevalid : in t_rate_bytevalid;
+                              instate         : in t_sparkle_state;
+                              outbuf          : out t_rate_buffer;
+                              outstate        : out t_sparkle_state) is
+    variable in_xor_state             : t_rate_buffer;
     variable wi, wj, z, t, tmpx, tmpy : t_uint32;
     variable j                        : natural;
     variable const_x                  : unsigned(2 downto 0);
-    variable state                    : sparkle_state_t := instate;
+    variable state                    : t_sparkle_state := instate;
   begin
     if hm then
       if incomplete then
@@ -241,10 +241,10 @@ architecture RTL of sparkle is
   end procedure;
 
   --============================================ Registers ==========================================================--
-  signal sparkle_state                                                  : sparkle_state_t;
-  signal inbuf_validbytes                                               : rate_bytevalid_t;
-  signal step_cnt                                                       : step_t;
-  signal state                                                          : fsm_state_t;
+  signal sparkle_state                                                  : t_sparkle_state;
+  signal inbuf_validbytes                                               : t_rate_bytevalid;
+  signal step_counter                                                   : t_step_counter;
+  signal state                                                          : t_fsm; --! FSM state
   signal perm_slim_steps, inbuf_ct, inbuf_ad, inbuf_eoi                 : boolean;
   signal hash_mode, dec_mode                                            : boolean;
   signal outbuf_tag_or_digest, outbuf_tagverif, final_perm, digest_last : boolean;
@@ -254,9 +254,9 @@ architecture RTL of sparkle is
   signal inbuf_slva, outbuf_slva               : t_slv_array(0 to MAX_RATE_WORDS - 1)(IO_WIDTH - 1 downto 0);
   signal input_word, output_word               : std_logic_vector(IO_WIDTH - 1 downto 0);
   signal output_validbytes                     : std_logic_vector(IO_WIDTH / 8 - 1 downto 0);
-  signal keybuf                                : key_buffer_t;
-  signal inbuf, outbuf                         : rate_buffer_t;
-  signal rho_whitened_state                    : sparkle_state_t;
+  signal keybuf                                : t_key_buffer;
+  signal inbuf, outbuf                         : t_rate_buffer;
+  signal rho_whitened_state                    : t_sparkle_state;
   signal inbuf_valid, inbuf_ready              : std_logic;
   signal inbuf_valid_words, outbuf_valid_words : t_bit_array(0 to MAX_RATE_WORDS - 1);
   signal keybuf_valid, keybuf_ready            : std_logic;
@@ -304,7 +304,7 @@ begin
     port map(
       clk                  => clk,
       reset                => reset,
-      in_bits_word         => key_bits,
+      in_bits_word         => key,
       in_bits_last         => '0',      -- ignored
       in_bits_valid_bytes  => (others => '-'), -- ignored
       in_valid             => key_valid,
@@ -345,7 +345,7 @@ begin
   inbuf           <= to_uint32_array(inbuf_slva);
   outbuf_slva     <= to_slva(outbuf);
   input_word      <= padword(bdi, bdi_validbytes, TRUE);
-  last_step       <= (perm_slim_steps and (step_cnt = (SPARKLE_STEPS_SLIM - 1))) or step_cnt = (SPARKLE_STEPS_BIG - 1);
+  last_step       <= (perm_slim_steps and (step_counter = (SPARKLE_STEPS_SLIM - 1))) or step_counter = (SPARKLE_STEPS_BIG - 1);
   --
   bdo_tagverif    <= to_std_logic(outbuf_tagverif);
   bdo_valid_bytes <= (others => '1') when outbuf_tag_or_digest else output_validbytes;
@@ -354,9 +354,9 @@ begin
   --============================================ Processes ==========================================================--
 
   COMB_PROC : process(all)
-    variable tmp_outbuf : rate_buffer_t;
+    variable tmp_outbuf : t_rate_buffer;
     variable tagbuf     : t_uint32_array(0 to TAG_WORDS - 1);
-    variable tmp_state  : sparkle_state_t;
+    variable tmp_state  : t_sparkle_state;
   begin
     rho_whi_or_addmsg(
       inbuf_ct, inbuf_ad, hash_mode, inbuf_last, inbuf_incomp, inbuf, inbuf_validbytes, sparkle_state,
@@ -426,7 +426,7 @@ begin
             -- if bdo_valid = '0' then
             if inbuf_valid = '1' and inbuf_ready = '1' then -- implies keybuf_valid = '1'
               sparkle_state   <= inbuf & keybuf; -- first nonce then key
-              step_cnt        <= (others => '0');
+              step_counter    <= (others => '0');
               state           <= S_PERMUTE;
               perm_slim_steps <= FALSE;
             end if;
@@ -436,10 +436,9 @@ begin
             dec_mode  <= decrypt_op = '1';
 
           when S_PERMUTE =>
-            sparkle_state <= sparkle_step(sparkle_state, step_cnt);
-            step_cnt      <= step_cnt + 1;
+            sparkle_state <= sparkle_step(sparkle_state, step_counter);
+            step_counter      <= step_counter + 1;
             if last_step then
-              step_cnt <= (others => '0');
               if final_perm then
                 state <= S_DIGEST when hash_mode else S_TAG;
               else
@@ -448,9 +447,11 @@ begin
             end if;
 
           when S_PROCESS_TEXT =>
+            step_counter <= (others => '0');
             if inbuf_valid = '1' and (inbuf_ad or outbuf_ready = '1') then
               sparkle_state   <= rho_whitened_state;
               perm_slim_steps <= inbuf_last = '0';
+
               state           <= S_PERMUTE;
               final_perm      <= inbuf_last = '1' and (not inbuf_ad or inbuf_eoi);
             end if;
@@ -467,6 +468,7 @@ begin
             end if;
 
           when S_DIGEST =>
+            step_counter <= (others => '0');
             if outbuf_ready then
               outbuf_tag_or_digest <= TRUE;
               digest_last          <= TRUE;
