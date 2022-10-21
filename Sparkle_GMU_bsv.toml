@@ -1,0 +1,41 @@
+name = "Sparkle_GMU_bsv"
+
+[language]
+vhdl.standard = "2008"
+
+[rtl]
+sources = ["gen_rtl/lwc.v"]
+top = "LWC"
+clock_port = "clk"
+
+[tb]
+sources = [
+    "vhdl/LWC_config.vhd",
+    "vhdl/LWC/NIST_LWAPI_pkg.vhd",
+    "tb/LWC_TB.vhd",
+]
+top = "LWC_TB"
+
+generics.G_FNAME_PDI.file = "KAT/kats_for_verification/pdi.txt"
+generics.G_FNAME_SDI.file = "KAT/kats_for_verification/sdi.txt"
+generics.G_FNAME_DO.file = "KAT/kats_for_verification/do.txt"
+# generics.G_TEST_MODE = 1                                       # 1: stall both inputs and output, 4: timing measurement
+# generics.G_RANDOM_STALL = true
+# generics.G_MAX_FAILURES = 0
+# generics.G_TIMEOUT_CYCLES = 100
+# generics.G_VERBOSE_LEVEL = 0
+# generics.G_PDI_STALLS = 3
+# generics.G_SDI_STALLS = 5
+# generics.G_DO_STALLS = 7
+
+[lwc]
+# block_bits = { AD = 128, XT = 128}
+aead.algorithm = "schwaemm256128v2"
+aead.key_reuse = true
+block_bits = { xt = 256, ad = 256, hm = 256 }
+
+# aead.input_sequence.decrypt = ['npub', 'ad', 'ct', 'tag']
+# hash.algorithm = "esch256v2"
+
+ports.pdi.bit_width = 32
+ports.sdi.bit_width = 32
