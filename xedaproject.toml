@@ -1,10 +1,10 @@
 [[design]]
 name = "sparkle_vhdl_cc"
 rtl.sources = [
-    "util_pkg.vhdl",
-    "sipo.vhdl",
-    "piso.vhdl",
-    "sparkle.vhdl",  #
+    "vhdl/util_pkg.vhdl",
+    "vhdl/SPARKLE_SIPO.vhdl",
+    "vhdl/SPARKLE_PISO.vhdl",
+    "vhdl/sparkle.vhdl",  #
 ]
 rtl.top = "sparkle"
 rtl.clock_port = "clk"
