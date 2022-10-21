@@ -8,7 +8,7 @@ use IEEE.std_logic_1164.all;
 
 use work.util_pkg.all;
 
-entity PISO is
+entity SPARKLE_PISO is
   generic(
     WORD_WIDTH       : positive;
     NUM_WORDS        : positive;
@@ -31,9 +31,9 @@ entity PISO is
     out_valid            : out std_logic;
     out_ready            : in  std_logic
   );
-end entity PISO;
+end entity SPARKLE_PISO;
 
-architecture RTL of PISO is
+architecture RTL of SPARKLE_PISO is
   --============================================ Registers ==========================================================--
   signal data_block : t_slv_array(0 to NUM_WORDS - 1)(WORD_WIDTH - 1 downto 0);
   signal validwords : t_bit_array(0 to NUM_WORDS - 1);

@@ -14,7 +14,7 @@ use IEEE.numeric_std.all;
 
 use work.util_pkg.all;
 
-entity SIPO is
+entity SPARKLE_SIPO is
   generic(
     WORD_WIDTH       : positive                     := 32;              -- width of each word in bits
     NUM_WORDS        : positive                     := 8;               -- depth
@@ -41,9 +41,9 @@ entity SIPO is
     out_valid            : out std_logic;
     out_ready            : in  std_logic
   );
-end entity SIPO;
+end entity SPARKLE_SIPO;
 
-architecture RTL of SIPO is
+architecture RTL of SPARKLE_SIPO is
   --============================================ Registers ==========================================================--
   signal block_reg               : t_slv_array(0 to NUM_WORDS - 1)(WORD_WIDTH - 1 downto 0);
   signal validbytes              : t_slv_array(0 to NUM_WORDS - 1)(WORD_WIDTH / 8 - 1 downto 0);

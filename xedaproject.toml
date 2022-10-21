@@ -1,10 +1,10 @@
 [[design]]
 name = "sparkle_vhdl_cc"
 rtl.sources = [
-    "vhdl/util_pkg.vhdl",
-    "vhdl/sipo.vhdl",
-    "vhdl/piso.vhdl",
-    "vhdl/sparkle.vhdl",  #
+    "util_pkg.vhdl",
+    "sipo.vhdl",
+    "piso.vhdl",
+    "sparkle.vhdl",  #
 ]
 rtl.top = "sparkle"
 rtl.clock_port = "clk"
@@ -32,7 +32,8 @@ rtl.top = "lwc"
 rtl.clock_port = "clk"
 tb.sources = ["tb/sparkleTb.py"]
 tb.top = "tb.sparkleTb"
-tb.cocotb = { module = 'tb.sparkleTb' }
+tb.cocotb = true
+# { module = 'tb.sparkleTb' }
 
 [[design]]
 name = "sparkle_blang_v"
@@ -43,7 +44,8 @@ rtl.top = "lwc"
 rtl.clock_port = "clk"
 tb.sources = ["tb/sparkleTb.py"]
 tb.top = "tb.sparkleTb"
-tb.cocotb = { module = 'tb.sparkleTb' }
+tb.cocotb = true
+# { module = 'tb.sparkleTb' }
 
 ######################################## Flow Settings ########################################
 

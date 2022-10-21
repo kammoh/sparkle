@@ -237,7 +237,7 @@ architecture RTL of sparkle is
   signal outbuf_last                           : std_logic;
 begin
   --============================================ Submodules =========================================================--
-  INBUF_SIPO : entity work.SIPO
+  INBUF_SIPO : entity work.SPARKLE_SIPO
     generic map(
       WORD_WIDTH       => IO_WIDTH,
       NUM_WORDS        => RATE_WORDS,
@@ -263,7 +263,7 @@ begin
       out_ready            => inbuf_ready
     );
 
-  KEY_SIPO : entity work.SIPO
+  KEY_SIPO : entity work.SPARKLE_SIPO
     generic map(
       WORD_WIDTH       => IO_WIDTH,
       NUM_WORDS        => KEY_WORDS,
@@ -289,7 +289,7 @@ begin
       out_ready            => keybuf_ready
     );
 
-  OUTBUF_PISO : entity work.PISO
+  OUTBUF_PISO : entity work.SPARKLE_PISO
     generic map(
       WORD_WIDTH       => IO_WIDTH,
       NUM_WORDS        => RATE_WORDS,
