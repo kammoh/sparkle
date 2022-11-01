@@ -19,15 +19,16 @@ entity sparkle is
   );
 
   port(
+    --# {{clocks|}}
     clk             : in  std_logic;
     reset           : in  std_logic;
-    --
+    --# {{bus(#f2d7c6)|}}
     key             : in  std_logic_vector(IO_WIDTH - 1 downto 0);
     key_valid       : in  std_logic;
     key_ready       : out std_logic;
     --
     key_update      : in  std_logic;    --- ???
-    --
+    --# {{bus(#9996a5)|}}
     bdi             : in  std_logic_vector(IO_WIDTH - 1 downto 0);
     bdi_last        : in  std_logic;
     bdi_validbytes  : in  std_logic_vector(IO_WIDTH / 8 - 1 downto 0);
@@ -38,7 +39,7 @@ entity sparkle is
     --
     decrypt_op      : in  std_logic;
     hash_op         : in  std_logic;
-    --
+    --# {{bus(#e0bbb6)|}}
     bdo             : out std_logic_vector(IO_WIDTH - 1 downto 0);
     bdo_last        : out std_logic;
     bdo_valid_bytes : out std_logic_vector(IO_WIDTH / 8 - 1 downto 0);
@@ -78,21 +79,24 @@ architecture RTL of sparkle is
   );                                    --! round constants
 
   --======================================= Functions/Procedures ====================================================--
-  procedure arxbox1(r1, r2 : in natural range 0 to 31; c : in t_uint32; x, y : inout t_uint32) is
+  --! Single-word ARX
+  procedure arxbox(r1, r2 : in natural range 0 to 31; c : in t_uint32; x, y : inout t_uint32) is
   begin
     x := x + rotate_right(y, r1);
     y := y xor rotate_right(x, r2);
     x := x xor c;
   end procedure;
 
+  --! Single-word Alzette
   procedure alzette(c : in t_uint32; x, y : inout t_uint32) is
   begin
-    arxbox1(31, 24, c, x, y);
-    arxbox1(17, 17, c, x, y);
-    arxbox1(00, 31, c, x, y);
-    arxbox1(24, 16, c, x, y);
+    arxbox(31, 24, c, x, y);
+    arxbox(17, 17, c, x, y);
+    arxbox(00, 31, c, x, y);
+    arxbox(24, 16, c, x, y);
   end procedure;
 
+  --! Single-word linear transfor
   function ell(x : t_uint32) return t_uint32 is
   begin
     return rotate_right(x xor shift_left(x, 16), 16);
@@ -149,7 +153,7 @@ architecture RTL of sparkle is
 
   function padword(word        : std_logic_vector(IO_WIDTH - 1 downto 0);
                    valid_bytes : std_logic_vector(IO_WIDTH/8 - 1 downto 0);
-                   pad_0x80    : BOOLEAN
+                   pad_0x80    : boolean
                   ) return std_logic_vector is
     variable ret : std_logic_vector(IO_WIDTH - 1 downto 0) := word;
   begin
