@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created by Symbolator http://kevinpt.github.io/symbolator -->
+<svg xmlns="http://www.w3.org/2000/svg"
+xmlns:xlink="http://www.w3.org/1999/xlink"
+xml:space="preserve"
+width="600" height="411" viewBox="-190 -20 600.0 411.0" version="1.1">
+<style type="text/css">
+<![CDATA[
+.fnt1 {fill:#000000;
+    font-family:Helvetica; font-size:12pt; font-weight:normal; font-style:normal;}
+.label {fill:#000;
+  text-anchor:middle;
+  font-size:16pt; font-weight:bold; font-family:Sans;}
+.link {fill: #0D47A1;}
+.link:hover {fill: #0D47A1; text-decoration:underline;}
+.link:visited {fill: #4A148C;}
+]]>
+</style>
+<defs>
+<marker id="clock" markerWidth="8.0" markerHeight="15.0" viewBox="0 0 8.0 15.0" refX="0.5" refY="7.5" orient="auto" markerUnits="userSpaceOnUse">
+<g transform="translate(0.5,7.5)"><path d="M 0 -7 L 0 7 L 7 0 z" stroke="#000000" fill="#FFFFFF" stroke-width="1"/>
+</g>
+</marker>
+</defs>
+<g transform="translate(0,0)">
+<rect x="0" y="-15.0" width="220" height="50.0" stroke="#000000" fill="#BFBFAF" stroke-width="1"/>
+<g transform="translate(0,0)">
+<line x1="-20" y1="0" x2="0" y2="0" stroke="#000000" fill="none" stroke-width="1" marker-end="url(#clock)"/>
+<text class="fnt1" x="10" y="0" text-anchor="normal" dy="4.5">clk</text>
+<text class="fnt1" x="-30" y="0" text-anchor="end" dy="4.5" style="fill:#969696">std_logic</text>
+</g>
+<g transform="translate(0,20)">
+<line x1="-20" y1="0" x2="0" y2="0" stroke="#000000" fill="none" stroke-width="1"/>
+<text class="fnt1" x="10" y="0" text-anchor="normal" dy="4.5">reset</text>
+<text class="fnt1" x="-30" y="0" text-anchor="end" dy="4.5" style="fill:#969696">std_logic</text>
+</g>
+</g>
+<g transform="translate(0,50.0)">
+<rect x="0" y="-15.0" width="220" height="70.0" stroke="#000000" fill="#F2D7C6" stroke-width="1"/>
+<g transform="translate(0,0)">
+<line x1="-20" y1="0" x2="0" y2="0" stroke="#000000" fill="none" stroke-width="3"/>
+<text class="fnt1" x="10" y="0" text-anchor="normal" dy="4.5">key</text>
+<text class="fnt1" x="-30" y="0" text-anchor="end" dy="4.5" style="fill:#969696">std_logic_vector<tspan fill="#039BE5">[31:0]</tspan></text>
+</g>
+<g transform="translate(0,20)">
+<line x1="-20" y1="0" x2="0" y2="0" stroke="#000000" fill="none" stroke-width="1"/>
+<text class="fnt1" x="10" y="0" text-anchor="normal" dy="4.5">key_valid</text>
+<text class="fnt1" x="-30" y="0" text-anchor="end" dy="4.5" style="fill:#969696">std_logic</text>
+</g>
+<g transform="translate(0,40)">
+<line x1="-20" y1="0" x2="0" y2="0" stroke="#000000" fill="none" stroke-width="1"/>
+<text class="fnt1" x="10" y="0" text-anchor="normal" dy="4.5">key_update</text>
+<text class="fnt1" x="-30" y="0" text-anchor="end" dy="4.5" style="fill:#969696">std_logic</text>
+</g>
+<g transform="translate(220,0)">
+<line x1="20" y1="0" x2="0" y2="0" stroke="#000000" fill="none" stroke-width="1"/>
+<text class="fnt1" x="-10" y="0" text-anchor="end" dy="4.5">key_ready</text>
+<text class="fnt1" x="30" y="0" text-anchor="normal" dy="4.5" style="fill:#969696">std_logic</text>
+</g>
+</g>
+<g transform="translate(0,120.0)">
+<rect x="0" y="-15.0" width="220" height="170.0" stroke="#000000" fill="#9996A5" stroke-width="1"/>
+<g transform="translate(0,0)">
+<line x1="-20" y1="0" x2="0" y2="0" stroke="#000000" fill="none" stroke-width="3"/>
+<text class="fnt1" x="10" y="0" text-anchor="normal" dy="4.5">bdi</text>
+<text class="fnt1" x="-30" y="0" text-anchor="end" dy="4.5" style="fill:#969696">std_logic_vector<tspan fill="#039BE5">[31:0]</tspan></text>
+</g>
+<g transform="translate(0,20)">
+<line x1="-20" y1="0" x2="0" y2="0" stroke="#000000" fill="none" stroke-width="1"/>
+<text class="fnt1" x="10" y="0" text-anchor="normal" dy="4.5">bdi_last</text>
+<text class="fnt1" x="-30" y="0" text-anchor="end" dy="4.5" style="fill:#969696">std_logic</text>
+</g>
+<g transform="translate(0,40)">
+<line x1="-20" y1="0" x2="0" y2="0" stroke="#000000" fill="none" stroke-width="3"/>
+<text class="fnt1" x="10" y="0" text-anchor="normal" dy="4.5">bdi_validbytes</text>
+<text class="fnt1" x="-30" y="0" text-anchor="end" dy="4.5" style="fill:#969696">std_logic_vector<tspan fill="#039BE5">[3:0]</tspan></text>
+</g>
+<g transform="translate(0,60)">
+<line x1="-20" y1="0" x2="0" y2="0" stroke="#000000" fill="none" stroke-width="3"/>
+<text class="fnt1" x="10" y="0" text-anchor="normal" dy="4.5">bdi_type</text>
+<text class="fnt1" x="-30" y="0" text-anchor="end" dy="4.5" style="fill:#969696">std_logic_vector<tspan fill="#039BE5">[3:0]</tspan></text>
+</g>
+<g transform="translate(0,80)">
+<line x1="-20" y1="0" x2="0" y2="0" stroke="#000000" fill="none" stroke-width="1"/>
+<text class="fnt1" x="10" y="0" text-anchor="normal" dy="4.5">bdi_eoi</text>
+<text class="fnt1" x="-30" y="0" text-anchor="end" dy="4.5" style="fill:#969696">std_logic</text>
+</g>
+<g transform="translate(0,100)">
+<line x1="-20" y1="0" x2="0" y2="0" stroke="#000000" fill="none" stroke-width="1"/>
+<text class="fnt1" x="10" y="0" text-anchor="normal" dy="4.5">bdi_valid</text>
+<text class="fnt1" x="-30" y="0" text-anchor="end" dy="4.5" style="fill:#969696">std_logic</text>
+</g>
+<g transform="translate(0,120)">
+<line x1="-20" y1="0" x2="0" y2="0" stroke="#000000" fill="none" stroke-width="1"/>
+<text class="fnt1" x="10" y="0" text-anchor="normal" dy="4.5">decrypt_op</text>
+<text class="fnt1" x="-30" y="0" text-anchor="end" dy="4.5" style="fill:#969696">std_logic</text>
+</g>
+<g transform="translate(0,140)">
+<line x1="-20" y1="0" x2="0" y2="0" stroke="#000000" fill="none" stroke-width="1"/>
+<text class="fnt1" x="10" y="0" text-anchor="normal" dy="4.5">hash_op</text>
+<text class="fnt1" x="-30" y="0" text-anchor="end" dy="4.5" style="fill:#969696">std_logic</text>
+</g>
+<g transform="translate(220,0)">
+<line x1="20" y1="0" x2="0" y2="0" stroke="#000000" fill="none" stroke-width="1"/>
+<text class="fnt1" x="-10" y="0" text-anchor="end" dy="4.5">bdi_ready</text>
+<text class="fnt1" x="30" y="0" text-anchor="normal" dy="4.5" style="fill:#969696">std_logic</text>
+</g>
+</g>
+<g transform="translate(0,290.0)">
+<rect x="0" y="-15.0" width="220" height="110.0" stroke="#000000" fill="#E0BBB6" stroke-width="1"/>
+<g transform="translate(0,0)">
+<line x1="-20" y1="0" x2="0" y2="0" stroke="#000000" fill="none" stroke-width="1"/>
+<text class="fnt1" x="10" y="0" text-anchor="normal" dy="4.5">bdo_ready</text>
+<text class="fnt1" x="-30" y="0" text-anchor="end" dy="4.5" style="fill:#969696">std_logic</text>
+</g>
+<g transform="translate(220,0)">
+<line x1="20" y1="0" x2="0" y2="0" stroke="#000000" fill="none" stroke-width="3"/>
+<text class="fnt1" x="-10" y="0" text-anchor="end" dy="4.5">bdo</text>
+<text class="fnt1" x="30" y="0" text-anchor="normal" dy="4.5" style="fill:#969696">std_logic_vector<tspan fill="#039BE5">[31:0]</tspan></text>
+</g>
+<g transform="translate(220,20)">
+<line x1="20" y1="0" x2="0" y2="0" stroke="#000000" fill="none" stroke-width="1"/>
+<text class="fnt1" x="-10" y="0" text-anchor="end" dy="4.5">bdo_last</text>
+<text class="fnt1" x="30" y="0" text-anchor="normal" dy="4.5" style="fill:#969696">std_logic</text>
+</g>
+<g transform="translate(220,40)">
+<line x1="20" y1="0" x2="0" y2="0" stroke="#000000" fill="none" stroke-width="3"/>
+<text class="fnt1" x="-10" y="0" text-anchor="end" dy="4.5">bdo_valid_bytes</text>
+<text class="fnt1" x="30" y="0" text-anchor="normal" dy="4.5" style="fill:#969696">std_logic_vector<tspan fill="#039BE5">[3:0]</tspan></text>
+</g>
+<g transform="translate(220,60)">
+<line x1="20" y1="0" x2="0" y2="0" stroke="#000000" fill="none" stroke-width="1"/>
+<text class="fnt1" x="-10" y="0" text-anchor="end" dy="4.5">bdo_tagverif</text>
+<text class="fnt1" x="30" y="0" text-anchor="normal" dy="4.5" style="fill:#969696">std_logic</text>
+</g>
+<g transform="translate(220,80)">
+<line x1="20" y1="0" x2="0" y2="0" stroke="#000000" fill="none" stroke-width="1"/>
+<text class="fnt1" x="-10" y="0" text-anchor="end" dy="4.5">bdo_valid</text>
+<text class="fnt1" x="30" y="0" text-anchor="normal" dy="4.5" style="fill:#969696">std_logic</text>
+</g>
+</g>
+<rect x="1.0" y="-14.0" width="218.0" height="398.0" stroke="#000000" fill="none" stroke-width="3"/>
+</svg>
