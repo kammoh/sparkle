@@ -1,7 +1,8 @@
 name = "Sparkle_GMU_vhdl"
 
 dependencies = [
-    { uri = "git+https://github.com/GMUCERG/LWC.git#hardware/LWC_32.toml", rtl.pos = 1 },
+    # "git+https://github.com/GMUCERG/LWC.git#hardware/LWC_32.toml"
+    "../../lwc/LWC/hardware/LWC_32.toml"
 ]
 
 [language]
@@ -25,17 +26,20 @@ sources = [
     # "LWC/fifo.vhd",
     # "LWC/LWC.vhd",
 ]
-top = "LWC"
-clock_port = "clk"
+# top = "LWC"
+# clock_port = "clk"
 
 [tb]
 # sources = ["../tb/LWC_TB.vhd"]
 # top = "LWC_TB"
 
-generics.G_FNAME_PDI.file = "../KAT/kats_for_verification/pdi.txt"
-generics.G_FNAME_SDI.file = "../KAT/kats_for_verification/sdi.txt"
-generics.G_FNAME_DO.file =  "../KAT/kats_for_verification/do.txt"
-generics.G_TEST_MODE = 1                                       # 1: stall both inputs and output, 4: timing measurement
+# generics.G_FNAME_PDI.file = "../KAT/kats_for_verification/pdi.txt"
+# generics.G_FNAME_SDI.file = "../KAT/kats_for_verification/sdi.txt"
+# generics.G_FNAME_DO.file = "../KAT/kats_for_verification/do.txt"
+generics.G_FNAME_PDI.file = "BENCH_KAT/Sparkle_GMU_vhdl/kats_for_verification/pdi.txt"
+generics.G_FNAME_SDI.file = "BENCH_KAT/Sparkle_GMU_vhdl/kats_for_verification/sdi.txt"
+generics.G_FNAME_DO.file =  "BENCH_KAT/Sparkle_GMU_vhdl/kats_for_verification/do.txt"
+generics.G_TEST_MODE = 1                                           # 1: stall both inputs and output, 4: timing measurement
 generics.G_RANDOM_STALL = true
 generics.G_MAX_FAILURES = 0
 generics.G_TIMEOUT_CYCLES = 100
@@ -45,13 +49,10 @@ generics.G_SDI_STALLS = 5
 generics.G_DO_STALLS = 7
 
 [lwc]
-# block_bits = { AD = 128, XT = 128}
 aead.algorithm = "schwaemm256128v2"
 aead.key_reuse = true
-block_bits = { xt = 256, ad = 256, hm = 256 }
-
-# aead.input_sequence.decrypt = ['npub', 'ad', 'ct', 'tag']
-# hash.algorithm = "esch256v2"
+block_bits = { xt = 256, ad = 256, hm = 128 }
+hash.algorithm = "esch256v2"
 
 ports.pdi.bit_width = 32
 ports.sdi.bit_width = 32

@@ -20,7 +20,7 @@ entity SPARKLE_SIPO is
     NUM_WORDS        : positive                     := 8;               -- depth
     WITH_VALID_BYTES : boolean                      := FALSE;           -- if  for each byte a valid flag is stored
     ZERO_FILL        : boolean                      := FALSE;           -- When `in_bits_last` fill `m` remaining free space with zeros in `m` clock cycles
-    PADDING_BYTE     : unsigned(7 downto 0) := (others => '0'); -- padding byte
+    PADDING_BYTE     : unsigned(7 downto 0)         := (others => '0'); -- padding byte
     PIPELINED        : boolean                      := TRUE             -- simultanous dequeue and enqueue when full
   );
   port(

@@ -57,20 +57,17 @@ architecture RTL of cryptocore is
   signal cc2_bdi_ready       : std_logic;
   signal cc2_bdo_word        : std_logic_vector(CCW - 1 downto 0);
   signal cc2_bdo_last        : std_logic;
-  signal cc2_bdo_tagverif    : std_logic;
   signal cc2_bdo_valid_bytes : std_logic_vector(CCW / 8 - 1 downto 0);
   signal cc2_bdo_valid       : std_logic;
   signal cc2_bdo_ready       : std_logic;
   signal compare_tag         : std_logic;
   signal bdi_tagverif        : std_logic;
-  signal bdo_tagverif        : std_logic;
+  signal cc2_bdo_tagverif    : std_logic;
 
 begin
   SPARKLE_INST : entity work.sparkle
     generic map(
-      IO_WIDTH         => CCW,
-      SPARKLE_RATE     => 256,
-      SPARKLE_CAPACITY => 128
+      IO_WIDTH => CCW
     )
     port map(
       clk                  => clk,
@@ -81,17 +78,17 @@ begin
       key_update           => cc2_key_update,
       bdi                  => cc2_bdi_word,
       bdi_last             => cc2_bdi_last,
-      bdi_validbytes            => cc2_bdi_valid_bytes,
-      bdi_type               => bdi_type,
+      bdi_validbytes       => cc2_bdi_valid_bytes,
+      bdi_type             => bdi_type,
       bdi_eoi              => cc2_bdi_eoi,
       bdi_valid            => cc2_bdi_valid,
       bdi_ready            => cc2_bdi_ready,
       decrypt_op           => decrypt_in,
       hash_op              => hash_in,
-      bdo_bits_word        => cc2_bdo_word,
-      bdo_bits_last        => cc2_bdo_last,
-      bdo_bits_valid_bytes => cc2_bdo_valid_bytes,
-      bdo_bits_tag         => cc2_bdo_tagverif,
+      bdo        => cc2_bdo_word,
+      bdo_last        => cc2_bdo_last,
+      bdo_valid_bytes => cc2_bdo_valid_bytes,
+      bdo_tagverif         => cc2_bdo_tagverif,
       bdo_valid            => cc2_bdo_valid,
       bdo_ready            => cc2_bdo_ready
     );
@@ -110,15 +107,13 @@ begin
   bdo_type            <= (others => '-');
   msg_auth_valid      <= send_auth;
   msg_auth            <= auth_success;
-  --
-  bdo_tagverif        <= cc2_bdo_tagverif;
   -- = HDR_TAG optimization, can't be HDR_LENGTH or HDR_HASH_VALUE (decrypt_in = 1)
   bdi_tagverif        <= decrypt_in and to_std_logic(bdi_type = HDR_TAG); -- to_std_logic(bdi_type(3 downto 2) = "10");
   cc2_bdi_valid       <= bdi_valid and not bdi_tagverif;
-  cc2_bdo_ready       <= bdi_valid and bdi_tagverif when bdo_tagverif else bdo_ready;
-  bdi_ready           <= bdo_tagverif and cc2_bdo_valid when bdi_tagverif else cc2_bdi_ready;
-  bdo_valid           <= cc2_bdo_valid and not bdo_tagverif;
-  compare_tag         <= bdo_tagverif and bdi_tagverif;
+  cc2_bdo_ready       <= bdi_valid and bdi_tagverif when cc2_bdo_tagverif else bdo_ready;
+  bdi_ready           <= cc2_bdo_tagverif and cc2_bdo_valid when bdi_tagverif else cc2_bdi_ready;
+  bdo_valid           <= cc2_bdo_valid and not cc2_bdo_tagverif;
+  compare_tag         <= cc2_bdo_tagverif and bdi_tagverif;
 
   REG_PROC : process(clk)
   begin

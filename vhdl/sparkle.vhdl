@@ -3,7 +3,7 @@
 -- Copyright       2021
 -- VHDL Standard   2008
 -- Description     Schwaemm and Esch: Lightweight Authenticated Encryption and Hashing using the Sparkle Permutation
--- TODO            Hashing (Esch) not implemented yet
+-- TODO            Hashing (Esch)
 --===================================================================================================================--
 library IEEE;
 use IEEE.std_logic_1164.all;
@@ -15,38 +15,36 @@ use work.util_pkg.all;
 
 entity sparkle is
   generic(
-    IO_WIDTH         : positive := 32;  -- TODO only 32 supported!
-    SPARKLE_RATE     : positive := 256;
-    SPARKLE_CAPACITY : positive := 128
+    IO_WIDTH : positive := 32
   );
 
   port(
-    clk                  : in  std_logic;
-    reset                : in  std_logic;
+    clk             : in  std_logic;
+    reset           : in  std_logic;
     --
-    key_bits             : in  std_logic_vector(IO_WIDTH - 1 downto 0);
-    key_valid            : in  std_logic;
-    key_ready            : out std_logic;
+    key_bits        : in  std_logic_vector(IO_WIDTH - 1 downto 0);
+    key_valid       : in  std_logic;
+    key_ready       : out std_logic;
     --
-    key_update           : in  std_logic; --- ???
+    key_update      : in  std_logic;    --- ???
     --
-    bdi                  : in  std_logic_vector(IO_WIDTH - 1 downto 0);
-    bdi_last             : in  std_logic;
-    bdi_validbytes       : in  std_logic_vector(IO_WIDTH / 8 - 1 downto 0);
-    bdi_type             : in  std_logic_vector(3 downto 0);
-    bdi_eoi              : in  std_logic;
-    bdi_valid            : in  std_logic;
-    bdi_ready            : out std_logic;
+    bdi             : in  std_logic_vector(IO_WIDTH - 1 downto 0);
+    bdi_last        : in  std_logic;
+    bdi_validbytes  : in  std_logic_vector(IO_WIDTH / 8 - 1 downto 0);
+    bdi_type        : in  std_logic_vector(3 downto 0);
+    bdi_eoi         : in  std_logic;
+    bdi_valid       : in  std_logic;
+    bdi_ready       : out std_logic;
     --
-    decrypt_op           : in  std_logic;
-    hash_op              : in  std_logic;
+    decrypt_op      : in  std_logic;
+    hash_op         : in  std_logic;
     --
-    bdo_bits_word        : out std_logic_vector(IO_WIDTH - 1 downto 0);
-    bdo_bits_last        : out std_logic;
-    bdo_bits_valid_bytes : out std_logic_vector(IO_WIDTH / 8 - 1 downto 0);
-    bdo_bits_tag         : out std_logic;
-    bdo_valid            : out std_logic;
-    bdo_ready            : in  std_logic
+    bdo             : out std_logic_vector(IO_WIDTH - 1 downto 0);
+    bdo_last        : out std_logic;
+    bdo_valid_bytes : out std_logic_vector(IO_WIDTH / 8 - 1 downto 0);
+    bdo_tagverif    : out std_logic;
+    bdo_valid       : out std_logic;
+    bdo_ready       : in  std_logic
   );
 
 end sparkle;
@@ -55,21 +53,23 @@ architecture RTL of sparkle is
   constant KEY_LEN            : positive := 128;
   constant TAG_WORDS          : positive := 4;
   constant KEY_WORDS          : positive := KEY_LEN / 32;
-  constant STATE_BITS         : positive := SPARKLE_RATE + SPARKLE_CAPACITY;
+  constant STATE_BITS         : positive := 384;
   constant STATE_BRANS        : positive := STATE_BITS / 64;
   constant STATE_WORDS        : positive := STATE_BITS / 32;
-  constant RATE_WORDS         : positive := SPARKLE_RATE / 32;
-  constant CAP_WORDS          : positive := SPARKLE_CAPACITY / 32;
+  constant HASH_RATE_WORDS    : positive := 128 / 32;
+  constant AEAD_RATE_WORDS    : positive := 256 / 32;
+  constant MAX_RATE_WORDS     : positive := maximum(HASH_RATE_WORDS, AEAD_RATE_WORDS);
+  constant AEAD_CAP_WORDS     : positive := STATE_WORDS - AEAD_RATE_WORDS;
   constant SPARKLE_STEPS_BIG  : positive := 11; -- 10, 11, 12
   constant SPARKLE_STEPS_SLIM : positive := 7; -- 8 for Sparkle512, o/w 7
 
-  subtype rate_bytevalid_t is t_slv_array(0 to RATE_WORDS - 1)(3 downto 0);
-  subtype rate_buffer_t is t_uint32_array(0 to RATE_WORDS - 1);
+  subtype rate_bytevalid_t is t_slv_array(0 to MAX_RATE_WORDS - 1)(3 downto 0);
+  subtype rate_buffer_t is t_uint32_array(0 to MAX_RATE_WORDS - 1);
   subtype key_buffer_t is t_uint32_array(0 to KEY_WORDS - 1);
   subtype sparkle_state_t is t_uint32_array(0 to STATE_WORDS - 1);
   subtype step_t is unsigned(log2ceil(SPARKLE_STEPS_BIG) - 1 downto 0);
 
-  type fsm_state_t is (INIT, PERMUTE, PROCESS_TEXT, FINALIZE_TAG);
+  type fsm_state_t is (S_INIT, S_PERMUTE, S_PROCESS_TEXT, S_TAG, S_DIGEST);
   type rcon_t is array (0 to 7) of t_uint32;
 
   constant RCON : rcon_t := (
@@ -136,7 +136,7 @@ architecture RTL of sparkle is
     return t;
   end function;
 
-  function inbuf_word(w, xw : t_uint32; valid_bytes : std_logic_vector(3 downto 0); ct : boolean) return t_uint32 is
+  function inbuf_word_masked(w, xw : t_uint32; valid_bytes : std_logic_vector(3 downto 0); ct : boolean) return t_uint32 is
     variable word : t_uint32 := w;
   begin
     for i in 0 to 3 loop
@@ -164,40 +164,54 @@ architecture RTL of sparkle is
     return ret;
   end function;
 
-  procedure rho_whi(ct              : in boolean;
-                    ad              : in boolean;
-                    last_block      : in boolean;
-                    incomplete      : in boolean;
-                    inbuf           : in rate_buffer_t;
-                    inbuf_bytevalid : in rate_bytevalid_t;
-                    instate         : in sparkle_state_t;
-                    outbuf          : out rate_buffer_t;
-                    outstate        : out sparkle_state_t) is
-    variable in_xor_state : rate_buffer_t;
-    variable wi, wj, z, t : t_uint32;
-    variable const_x      : integer;
-    variable j            : natural;
-    variable state        : sparkle_state_t := instate;
+  procedure rho_whi_or_addmsg(ct              : in boolean;
+                              ad              : in boolean;
+                              hm              : in boolean;
+                              last_block      : in std_logic;
+                              incomplete      : in std_logic;
+                              inbuf           : in rate_buffer_t;
+                              inbuf_bytevalid : in rate_bytevalid_t;
+                              instate         : in sparkle_state_t;
+                              outbuf          : out rate_buffer_t;
+                              outstate        : out sparkle_state_t) is
+    variable in_xor_state             : rate_buffer_t;
+    variable wi, wj, z, t, tmpx, tmpy : t_uint32;
+    variable j                        : natural;
+    variable const_x                  : unsigned(2 downto 0);
+    variable state                    : sparkle_state_t := instate;
   begin
-    if last_block then
-      if ad then
-        const_x := 4 when incomplete else 5;
+    if hm then
+      if incomplete then
+        const_x := "001";
       else
-        const_x := 6 when incomplete else 7;
+        const_x := "010";
       end if;
-      j                                   := 24 + 3 - 1;
-      state(STATE_WORDS - 1)(j downto 24) := state(STATE_WORDS - 1)(j downto 24) xor to_unsigned(const_x, 3);
+    else
+      const_x := '1' & not to_std_logic(ad) & not incomplete;
     end if;
 
-    for i in 0 to RATE_WORDS - 1 loop
+    if last_block = '1' then
+      state(STATE_WORDS - 1)(26 downto 24) := state(STATE_WORDS - 1)(26 downto 24) xor const_x;
+    end if;
+
+    for i in 0 to HASH_RATE_WORDS - 1 loop
       in_xor_state(i) := inbuf(i) xor state(i);
     end loop;
-    for i in 0 to RATE_WORDS / 2 - 1 loop
-      j  := i + RATE_WORDS / 2;
-      wi := inbuf_word(inbuf(i), in_xor_state(i), inbuf_bytevalid(i), ct);
-      wj := inbuf_word(inbuf(j), in_xor_state(j), inbuf_bytevalid(j), ct);
-      z  := state(j) xor wi xor state(RATE_WORDS + i);
-      t  := state(i) xor wj xor state(RATE_WORDS + (j mod CAP_WORDS));
+    for i in HASH_RATE_WORDS to AEAD_RATE_WORDS - 1 loop
+      if hm then
+        in_xor_state(i) := state(i);
+      else
+        in_xor_state(i) := inbuf(i) xor state(i);
+      end if;
+    end loop;
+    outbuf := in_xor_state;
+
+    for i in 0 to AEAD_RATE_WORDS / 2 - 1 loop
+      j  := i + AEAD_RATE_WORDS / 2;
+      wi := inbuf_word_masked(inbuf(i), in_xor_state(i), inbuf_bytevalid(i), ct);
+      wj := inbuf_word_masked(inbuf(j), in_xor_state(j), inbuf_bytevalid(j), ct);
+      z  := state(j) xor wi xor state(AEAD_RATE_WORDS + i);
+      t  := state(i) xor wj xor state(AEAD_RATE_WORDS + (j mod AEAD_CAP_WORDS));
 
       if ct then
         state(i) := state(i) xor z;
@@ -206,41 +220,56 @@ architecture RTL of sparkle is
         state(i) := z;
         state(j) := state(j) xor t;
       end if;
-
-      outbuf(i) := in_xor_state(i);
-      outbuf(j) := in_xor_state(j);
     end loop;
-    outstate := state;
+
+    tmpx := inbuf(0);
+    tmpy := inbuf(1);
+    for i in 1 to STATE_WORDS / 4 loop
+      tmpx := tmpx xor inbuf(2 * i);
+      tmpy := tmpy xor inbuf(2 * i + 1);
+    end loop;
+
+    if hm then
+      for i in 0 to STATE_BRANS / 2 - 1 loop
+        outstate(2 * i)     := in_xor_state(2 * i) xor ell(tmpy);
+        outstate(2 * i + 1) := in_xor_state(2 * i + 1) xor ell(tmpx);
+      end loop;
+    else
+      outstate := state;
+    end if;
+
   end procedure;
 
   --============================================ Registers ==========================================================--
-  signal sparkle_state                                            : sparkle_state_t;
-  signal inbuf_validbytes                                         : rate_bytevalid_t;
-  signal step_cnt                                                 : step_t;
-  signal state, post_perm_state                                   : fsm_state_t;
-  signal perm_slim_steps, inbuf_ct, inbuf_hm, inbuf_ad, inbuf_eoi : boolean;
-  signal outbuf_tag, outbuf_tagverif                              : boolean;
+  signal sparkle_state                                                  : sparkle_state_t;
+  signal inbuf_validbytes                                               : rate_bytevalid_t;
+  signal step_cnt                                                       : step_t;
+  signal state                                                          : fsm_state_t;
+  signal perm_slim_steps, inbuf_ct, inbuf_ad, inbuf_eoi                 : boolean;
+  signal hash_mode, dec_mode                                            : boolean;
+  signal outbuf_tag_or_digest, outbuf_tagverif, final_perm, digest_last : boolean;
 
   --============================================== Wires ============================================================--
   signal keybuf_slva                           : t_slv_array(0 to KEY_WORDS - 1)(IO_WIDTH - 1 downto 0);
-  signal inbuf_slva, outbuf_slva               : t_slv_array(0 to RATE_WORDS - 1)(IO_WIDTH - 1 downto 0);
+  signal inbuf_slva, outbuf_slva               : t_slv_array(0 to MAX_RATE_WORDS - 1)(IO_WIDTH - 1 downto 0);
   signal input_word, output_word               : std_logic_vector(IO_WIDTH - 1 downto 0);
   signal output_validbytes                     : std_logic_vector(IO_WIDTH / 8 - 1 downto 0);
   signal keybuf                                : key_buffer_t;
   signal inbuf, outbuf                         : rate_buffer_t;
   signal rho_whitened_state                    : sparkle_state_t;
   signal inbuf_valid, inbuf_ready              : std_logic;
-  signal inbuf_valid_words, outbuf_valid_words : t_bit_array(0 to RATE_WORDS - 1);
+  signal inbuf_valid_words, outbuf_valid_words : t_bit_array(0 to MAX_RATE_WORDS - 1);
   signal keybuf_valid, keybuf_ready            : std_logic;
   signal outbuf_valid, outbuf_ready            : std_logic;
   signal inbuf_last, inbuf_incomp              : std_logic;
   signal outbuf_last                           : std_logic;
+  signal last_step                             : boolean;
 begin
   --============================================ Submodules =========================================================--
   INBUF_SIPO : entity work.SPARKLE_SIPO
     generic map(
       WORD_WIDTH       => IO_WIDTH,
-      NUM_WORDS        => RATE_WORDS,
+      NUM_WORDS        => MAX_RATE_WORDS,
       WITH_VALID_BYTES => TRUE,
       ZERO_FILL        => TRUE,
       PADDING_BYTE     => X"80",
@@ -292,7 +321,7 @@ begin
   OUTBUF_PISO : entity work.SPARKLE_PISO
     generic map(
       WORD_WIDTH       => IO_WIDTH,
-      NUM_WORDS        => RATE_WORDS,
+      NUM_WORDS        => MAX_RATE_WORDS,
       WITH_VALID_BYTES => TRUE
     )
     port map(
@@ -305,21 +334,22 @@ begin
       in_valid             => outbuf_valid,
       in_ready             => outbuf_ready,
       out_bits_word        => output_word,
-      out_bits_last        => bdo_bits_last,
+      out_bits_last        => bdo_last,
       out_bits_valid_bytes => output_validbytes,
       out_valid            => bdo_valid,
       out_ready            => bdo_ready
     );
 
   --============================================== Assigns ==========================================================--
-  keybuf               <= to_uint32_array(keybuf_slva);
-  inbuf                <= to_uint32_array(inbuf_slva);
-  outbuf_slva          <= to_slva(outbuf);
-  input_word           <= padword(bdi, bdi_validbytes, TRUE);
+  keybuf          <= to_uint32_array(keybuf_slva);
+  inbuf           <= to_uint32_array(inbuf_slva);
+  outbuf_slva     <= to_slva(outbuf);
+  input_word      <= padword(bdi, bdi_validbytes, TRUE);
+  last_step       <= (perm_slim_steps and (step_cnt = (SPARKLE_STEPS_SLIM - 1))) or step_cnt = (SPARKLE_STEPS_BIG - 1);
   --
-  bdo_bits_tag         <= to_std_logic(outbuf_tagverif);
-  bdo_bits_valid_bytes <= (others => '1') when outbuf_tag else output_validbytes;
-  bdo_bits_word        <= padword(output_word, bdo_bits_valid_bytes, FALSE);
+  bdo_tagverif    <= to_std_logic(outbuf_tagverif);
+  bdo_valid_bytes <= (others => '1') when outbuf_tag_or_digest else output_validbytes;
+  bdo             <= padword(output_word, bdo_valid_bytes, FALSE);
 
   --============================================ Processes ==========================================================--
 
@@ -328,13 +358,15 @@ begin
     variable tagbuf     : t_uint32_array(0 to TAG_WORDS - 1);
     variable tmp_state  : sparkle_state_t;
   begin
-    rho_whi(
-      inbuf_ct, inbuf_ad, inbuf_last = '1', inbuf_incomp = '1', inbuf, inbuf_validbytes, sparkle_state,
+    rho_whi_or_addmsg(
+      inbuf_ct, inbuf_ad, hash_mode, inbuf_last, inbuf_incomp, inbuf, inbuf_validbytes, sparkle_state,
       tmp_outbuf, tmp_state
     );
+
     for i in 0 to TAG_WORDS - 1 loop
-      tagbuf(i) := sparkle_state(RATE_WORDS + i) xor keybuf(i);
+      tagbuf(i) := sparkle_state(AEAD_RATE_WORDS + i) xor keybuf(i);
     end loop;
+
     outbuf_last        <= inbuf_last;
     outbuf             <= tmp_outbuf;
     outbuf_valid_words <= inbuf_valid_words;
@@ -342,77 +374,107 @@ begin
     inbuf_ready        <= '0';
     keybuf_ready       <= '0';
     outbuf_valid       <= '0';
+
     case state is
-      when INIT =>                      -- load npub and optionally key
+      when S_INIT =>
+        -- if bdo_valid = '0' then
+        -- load npub and optionally key
         inbuf_ready  <= keybuf_valid and not key_update;
         keybuf_ready <= key_update;     -- ???
-      when PROCESS_TEXT =>
+      -- end if;
+
+      when S_PROCESS_TEXT =>
         inbuf_ready  <= to_std_logic(inbuf_ad) or outbuf_ready;
         outbuf_valid <= not to_std_logic(inbuf_ad) and inbuf_valid;
-      when PERMUTE =>
+
+      when S_PERMUTE =>
         null;
-      when FINALIZE_TAG =>
+
+      when S_TAG =>
         outbuf(0 to TAG_WORDS - 1) <= tagbuf;
         outbuf_valid_words         <= (X"F", others => '0');
         outbuf_last                <= '1';
         outbuf_valid               <= '1';
+
+      when S_DIGEST =>
+        outbuf(0 to TAG_WORDS - 1) <= tagbuf;
+        outbuf_valid_words         <= (X"F", others => '0');
+        outbuf_last                <= to_std_logic(digest_last);
+        outbuf_valid               <= '1';
+
     end case;
+
   end process;
 
-  FLAG_REG_PROC : process(clk)
+  REG_PROC : process(clk)
   begin
     if rising_edge(clk) then
       -- keep value of these flags associated with the last received bdi word
       if bdi_valid = '1' and bdi_ready = '1' then
         inbuf_ad  <= bdi_type = HDR_AD;
+        inbuf_ct  <= bdi_type = HDR_CT; -- TODO optimize?
         inbuf_eoi <= bdi_eoi = '1';
       end if;
-    end if;
-  end process;
 
-  inbuf_hm <= hash_op = '1';
-  inbuf_ct <= decrypt_op = '1' and not inbuf_ad;
-
-  REG_PROC : process(clk)
-  begin
-    if rising_edge(clk) then
       if reset = '1' then
-        state <= INIT;
+        state <= S_INIT;
       else
         case state is
-          when INIT =>
+          when S_INIT =>
+            digest_last <= FALSE;
+            final_perm  <= inbuf_eoi;
+            -- if bdo_valid = '0' then
             if inbuf_valid = '1' and inbuf_ready = '1' then -- implies keybuf_valid = '1'
               sparkle_state   <= inbuf & keybuf; -- first nonce then key
               step_cnt        <= (others => '0');
-              state           <= PERMUTE;
+              state           <= S_PERMUTE;
               perm_slim_steps <= FALSE;
-              post_perm_state <= FINALIZE_TAG when inbuf_eoi else PROCESS_TEXT;
             end if;
-          when PERMUTE =>
+            -- end if;
+
+            hash_mode <= hash_op = '1';
+            dec_mode  <= decrypt_op = '1';
+
+          when S_PERMUTE =>
             sparkle_state <= sparkle_step(sparkle_state, step_cnt);
             step_cnt      <= step_cnt + 1;
-            if (perm_slim_steps and (step_cnt = (SPARKLE_STEPS_SLIM - 1))) or step_cnt = (SPARKLE_STEPS_BIG - 1) then
+            if last_step then
               step_cnt <= (others => '0');
-              state    <= post_perm_state;
+              if final_perm then
+                state <= S_DIGEST when hash_mode else S_TAG;
+              else
+                state <= S_PROCESS_TEXT;
+              end if;
             end if;
-          when PROCESS_TEXT =>
+
+          when S_PROCESS_TEXT =>
             if inbuf_valid = '1' and (inbuf_ad or outbuf_ready = '1') then
               sparkle_state   <= rho_whitened_state;
               perm_slim_steps <= inbuf_last = '0';
-              state           <= PERMUTE;
-              post_perm_state <= state when inbuf_last = '0' or (inbuf_ad and not inbuf_eoi) else FINALIZE_TAG;
+              state           <= S_PERMUTE;
+              final_perm      <= inbuf_last = '1' and (not inbuf_ad or inbuf_eoi);
             end if;
-            if outbuf_valid and outbuf_ready then -- outbuf is empty (or will be)
-              outbuf_tag      <= FALSE; -- overriden in FINALIZE_TAG
-              outbuf_tagverif <= FALSE; -- overriden in FINALIZE_TAG
+            if outbuf_valid and outbuf_ready then -- update IFF outbuf is loaded
+              outbuf_tag_or_digest <= FALSE; -- overriden in FINALIZE_TAG
+              outbuf_tagverif      <= FALSE; -- overriden in FINALIZE_TAG
             end if;
-          when FINALIZE_TAG =>
-            if outbuf_ready = '1' then
-              outbuf_tag      <= TRUE;
-              outbuf_tagverif <= decrypt_op = '1';
-              state           <= INIT;
+
+          when S_TAG =>
+            if outbuf_ready then
+              outbuf_tag_or_digest <= TRUE;
+              outbuf_tagverif      <= dec_mode;
+              state                <= S_INIT;
             end if;
+
+          when S_DIGEST =>
+            if outbuf_ready then
+              outbuf_tag_or_digest <= TRUE;
+              digest_last          <= TRUE;
+              state                <= S_INIT when digest_last else S_PERMUTE;
+            end if;
+
         end case;
+
       end if;
     end if;
   end process;
