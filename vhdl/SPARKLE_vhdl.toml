@@ -29,7 +29,6 @@ clock_port = "clk"
 generics.G_FNAME_PDI.file = "BENCH_KAT/Sparkle_GMU_vhdl/kats_for_verification/pdi.txt"
 generics.G_FNAME_SDI.file = "BENCH_KAT/Sparkle_GMU_vhdl/kats_for_verification/sdi.txt"
 generics.G_FNAME_DO.file =  "BENCH_KAT/Sparkle_GMU_vhdl/kats_for_verification/do.txt"
-
 generics.G_TEST_MODE = 1                                           # 1: stall both inputs and output, 4: timing measurement
 generics.G_RANDOM_STALL = true
 generics.G_MAX_FAILURES = 0

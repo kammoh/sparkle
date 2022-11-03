@@ -19,7 +19,6 @@ entity SPARKLE_PISO is
     reset           : in  std_logic;
     --
     in_data         : in  t_slv_array(0 to NUM_WORDS - 1)(WORD_WIDTH - 1 downto 0);
-    in_valid_words  : in  t_bit_array(0 to NUM_WORDS - 1);
     in_valid_bytes  : in  t_slv_array(0 to NUM_WORDS - 1)(WORD_WIDTH / 8 - 1 downto 0);
     in_last         : in  std_logic;
     in_valid        : in  std_logic;
@@ -34,6 +33,8 @@ entity SPARKLE_PISO is
 end entity SPARKLE_PISO;
 
 architecture RTL of SPARKLE_PISO is
+  constant VB_ZERO : std_logic_vector(WORD_WIDTH / 8 - 1 downto 0) := (others => '0');
+
   --============================================ Registers ==========================================================--
   signal data_block : t_slv_array(0 to NUM_WORDS - 1)(WORD_WIDTH - 1 downto 0);
   signal validwords : t_bit_array(0 to NUM_WORDS - 1);
@@ -55,35 +56,42 @@ begin
 
   GEN_WITH_VALID_BYTES : if WITH_VALID_BYTES generate
     out_valid_bytes <= validbytes(0);
-
+    GEN_VALIDWORDS_ALIAS : for i in validwords'range generate
+      validwords(i) <= validbytes(i)(0);
+    end generate;
+    --
     VALIDBYTES_PROC : process(clk)
     begin
       if rising_edge(clk) then
         if enq then
           validbytes <= in_valid_bytes;
         elsif deq then
-          validbytes(0 to validbytes'high - 1) <= validbytes(1 to validbytes'high);
+          validbytes <= validbytes(1 to validbytes'high) & VB_ZERO;
         end if;
       end if;
     end process;
-  else generate
-    out_valid_bytes <= (others => '-');
-  end generate;
 
-  VALIDWORDS_PROC : process(clk)
-  begin
-    if rising_edge(clk) then
-      if reset = '1' then
-        validwords(0) <= '0';
-      else
-        if enq then                     -- enq or enq+deq
-          validwords <= in_valid_words;
-        elsif deq then
-          validwords <= validwords(1 to validwords'high) & '0';
+  else generate                         ---------------- not WITH_VALID_BYTES
+    out_valid_bytes <= (others => '-');
+    --
+    process(clk)
+    begin
+      if rising_edge(clk) then
+        if reset = '1' then
+          validwords(0) <= '0';
+        else
+          if enq then                   -- enq or enq+deq
+            for i in validwords'range loop
+              validwords(i) <= in_valid_bytes(i)(0);
+            end loop;
+          elsif deq then
+            validwords <= validwords(1 to validwords'high) & '0';
+          end if;
         end if;
       end if;
-    end if;
-  end process;
+    end process;
+
+  end generate;
 
   DATABLOCK_PROC : process(clk)
   begin

@@ -102,6 +102,7 @@ begin
           end if;
           do_pad_byte <= FALSE;
           if enq then
+            last  <= in_last;
             small <= in_small_cap = '1';
             if in_last = '1' and (not one_short or deq) then
               do_pad_byte <= in_valid_bytes(WORD_WIDTH / 8 - 1) = '1';
@@ -131,7 +132,7 @@ begin
           incomplete <= ((not one_short or deq) and in_last = '1') or in_valid_bytes(WORD_WIDTH / 8 - 1) = '0';
         end if;
         if shift_in then
-          if SMALL_CAP > 0 and in_small_cap = '1' then
+          if shift_in_small then
             validbytes(0 to SMALL_CAP - 1) <= validbytes(1 to SMALL_CAP - 1) & next_validbytes;
           else
             validbytes <= validbytes(1 to validbytes'high) & next_validbytes;
@@ -152,12 +153,14 @@ begin
   end generate;
 
   shift_in <= fill_zeros or enq;
+
   GEN_SHIFT_IN_SMALL : if SMALL_CAP > 0 generate
+    shift_in_small <= small when fill_zeros else in_small_cap = '1';
     process(clk)
     begin
       if rising_edge(clk) then
         if shift_in then
-          if in_small_cap then
+          if shift_in_small then
             block_reg(0 to SMALL_CAP - 1) <= block_reg(1 to SMALL_CAP - 1) & next_word;
           else
             block_reg <= block_reg(1 to block_reg'high) & next_word;
@@ -165,7 +168,9 @@ begin
         end if;
       end if;
     end process;
-    shift_in_small <= small when fill_zeros else in_small_cap = '1';
+    process(all)
+    begin
+    end process;
   else generate
     process(clk)
     begin
@@ -184,30 +189,26 @@ begin
       if reset = '1' then
         word_valids <= (others => '0');
       else
-        if fill_zeros then              -- optimized-out when ZERO_FILL = FALSE
-          if shift_in_small then
-            word_valids(0 to SMALL_CAP - 1) <= word_valids(1 to SMALL_CAP - 1) & '0';
-          else
-            word_valids <= word_valids(1 to word_valids'high) & '0'; -- FIXME this is probably wrong! should be '1' (and remove out_bits_valid_words)! word_valids is a gauge!
-          end if;
-        end if;
-        if enq then
-          last <= in_last;
-          if deq then                   -- enq _and_ deq
-            if shift_in_small then
-              word_valids <= (0 to SMALL_CAP - 2 => '0') & '1' & (SMALL_CAP to word_valids'high => '0');
-            else
-              word_valids <= (1 to word_valids'high => '0') & '1';
-            end if;
-          else
-            if shift_in_small then
-              word_valids(0 to maximum(1, SMALL_CAP) - 1) <= word_valids(1 to SMALL_CAP - 1) & '1';
-            else
-              word_valids <= word_valids(1 to word_valids'high) & '1';
-            end if;
-          end if;
-        elsif deq then
+        if deq then
           word_valids <= (others => '0');
+        end if;
+        if shift_in then                -- optimized-out when ZERO_FILL = FALSE
+          if shift_in_small then
+            word_valids(0 to maximum(1, SMALL_CAP) - 1) <= word_valids(1 to SMALL_CAP - 1) & '1';
+          else
+            word_valids <= word_valids(1 to word_valids'high) & '1';
+          end if;
+          if deq then
+            if shift_in_small then
+              -- word_valids <= (0 to SMALL_CAP - 2 => '0') & '1' & (SMALL_CAP to word_valids'high => '0');
+              for i in word_valids'range loop
+                word_valids(i) <= '1' when i = SMALL_CAP - 1 else '0';
+                -- (SMALL_CAP - 1 => '1', others => '0');
+              end loop;
+            else
+              word_valids <= (0 to NUM_WORDS - 2 => '0') & '1';
+            end if;
+          end if;
         end if;
       end if;
     end if;

@@ -78,15 +78,23 @@ static void add_msg_blk(SparkleState *state, const uint8_t *in, size_t inlen)
     tmpx ^= buffer[i];
     tmpy ^= buffer[i+1];
   }
+#ifdef DEBUG
+  printf("tmpx:%08x tmpy:%08x\n", tmpx, tmpy);
+#endif
   tmpx = ELL(tmpx);
   tmpy = ELL(tmpy);
+#ifdef DEBUG
+  printf("ELL(tmpx):%08x ELL(tmpy):%08x\n", tmpx, tmpy);
+#endif
   // Feistel function part 2: state is XORed with tmpx/tmpy and msg
   for(i = 0; i < (STATE_BRANS/2); i++) {
     state->x[i] ^= (buffer[2*i] ^ tmpy);
     state->y[i] ^= (buffer[2*i+1] ^ tmpx);
   }
 
-  // print_state_ref(state, STATE_BRANS);
+#ifdef DEBUG
+  print_state_ref(state, STATE_BRANS);
+#endif
 }
 
 
@@ -192,7 +200,8 @@ void printhex(const UChar *b, ULLInt len) {
 
 int main() {
   UChar digest[DIGEST_BYTES];
-  const UChar msg[] = {0x0, 0x1, 0x2, 0x3};
+  // const UChar msg[] = {0x0, 0x1, 0x2, 0x3};
+  const UChar msg[] = {};
   crypto_hash(digest, msg, sizeof(msg));
 
   printf("message: ");

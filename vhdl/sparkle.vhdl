@@ -156,7 +156,7 @@ architecture RTL of sparkle is
     for i in valid_bytes'range loop
       if valid_bytes(i) = '0' then
         ret(8 * (i + 1) - 1 downto 8 * i) := (others => '0');
-        if i > 0 and valid_bytes(i - 1) = '1' then
+        if i = 0 or (valid_bytes(i - 1) = '1') then
           ret(8 * (i + 1) - 1) := '1';
         end if;
       end if;
@@ -194,7 +194,7 @@ architecture RTL of sparkle is
 
     outstate := state;
 
-    for i in 0 to AEAD_RATE_WORDS - 1 loop
+    for i in in_xor_state'range loop
       in_xor_state(i) := inbuf(i) xor state(i);
     end loop;
     outbuf := in_xor_state;
@@ -247,20 +247,19 @@ architecture RTL of sparkle is
   signal outbuf_tagverif, final_perm, digest_last                 : boolean;
 
   --============================================== Wires ============================================================--
-  signal keybuf_slva                           : t_slv_array(0 to KEY_WORDS - 1)(IO_WIDTH - 1 downto 0);
-  signal inbuf_slva, outbuf_data               : t_slv_array(0 to MAX_RATE_WORDS - 1)(IO_WIDTH - 1 downto 0);
-  signal input_word                            : std_logic_vector(IO_WIDTH - 1 downto 0);
-  signal keybuf                                : t_key_buffer;
-  signal inbuf, outbuf                         : t_rate_buffer;
-  signal rho_whi_add                           : t_sparkle_state;
-  signal inbuf_valid, inbuf_ready              : std_logic;
-  signal inbuf_valid_words, outbuf_valid_words : t_bit_array(0 to MAX_RATE_WORDS - 1);
-  signal outbuf_valid_bytes                    : t_rate_bytevalid;
-  signal keybuf_valid, keybuf_ready            : std_logic;
-  signal outbuf_valid, outbuf_ready            : std_logic;
-  signal inbuf_last, inbuf_incomp              : std_logic;
-  signal outbuf_last                           : std_logic;
-  signal last_step                             : boolean;
+  signal keybuf_slva                : t_slv_array(0 to KEY_WORDS - 1)(IO_WIDTH - 1 downto 0);
+  signal inbuf_slva, outbuf_data    : t_slv_array(0 to MAX_RATE_WORDS - 1)(IO_WIDTH - 1 downto 0);
+  signal input_word                 : std_logic_vector(IO_WIDTH - 1 downto 0);
+  signal keybuf                     : t_key_buffer;
+  signal inbuf, outbuf              : t_rate_buffer;
+  signal rho_whi_add                : t_sparkle_state;
+  signal inbuf_valid, inbuf_ready   : std_logic;
+  signal outbuf_valid_bytes         : t_rate_bytevalid;
+  signal keybuf_valid, keybuf_ready : std_logic;
+  signal outbuf_valid, outbuf_ready : std_logic;
+  signal inbuf_last, inbuf_incomp   : std_logic;
+  signal outbuf_last                : std_logic;
+  signal last_step                  : boolean;
 begin
   --============================================ Submodules =========================================================--
   INBUF_SIPO : entity work.SPARKLE_SIPO
@@ -283,7 +282,7 @@ begin
       in_valid        => bdi_valid,
       in_ready        => bdi_ready,
       out_data        => inbuf_slva,
-      out_valid_words => inbuf_valid_words,
+      -- out_valid_words => inbuf_valid_words,
       out_valid_bytes => inbuf_valid_bytes,
       out_last        => inbuf_last,
       out_incomplete  => inbuf_incomp,
@@ -329,7 +328,6 @@ begin
       clk             => clk,
       reset           => reset,
       in_data         => outbuf_data,
-      in_valid_words  => outbuf_valid_words,
       in_valid_bytes  => outbuf_valid_bytes,
       in_last         => outbuf_last,
       in_valid        => outbuf_valid,
@@ -367,7 +365,6 @@ begin
 
     outbuf_last        <= inbuf_last;
     outbuf             <= tmp_outbuf;
-    outbuf_valid_words <= inbuf_valid_words;
     outbuf_valid_bytes <= inbuf_valid_bytes;
     rho_whi_add        <= tmp_state;
     inbuf_ready        <= '0';
@@ -378,7 +375,7 @@ begin
       when S_INIT =>
         -- if bdo_valid = '0' then
         -- load npub and optionally key
-        inbuf_ready  <= keybuf_valid and not key_update;
+        inbuf_ready  <= '0' when inbuf_hm else keybuf_valid and not key_update;
         keybuf_ready <= key_update;     -- ???
       -- end if;
 
@@ -391,15 +388,15 @@ begin
 
       when S_TAG =>
         outbuf(0 to TAG_WORDS - 1) <= tag;
-        outbuf_valid_words         <= (0 to TAG_WORDS - 1 => '1', others => '0');
-        outbuf_valid_bytes         <= (others => X"F"); -- extra but ok since valid_words are not set
+        -- outbuf_valid_words         <= (0 to TAG_WORDS - 1 => '1', others => '0');
+        outbuf_valid_bytes         <= (0 to TAG_WORDS - 1 => X"F", others => X"0");
         outbuf_last                <= '1';
         outbuf_valid               <= '1';
 
       when S_DIGEST =>
         outbuf(0 to HASH_RATE_WORDS - 1) <= sparkle_state(0 to HASH_RATE_WORDS - 1);
-        outbuf_valid_words               <= (0 to HASH_RATE_WORDS - 1 => '1', others => '0');
-        outbuf_valid_bytes               <= (others => X"F");
+        -- outbuf_valid_words               <= (0 to HASH_RATE_WORDS - 1 => '1', others => '0');
+        outbuf_valid_bytes               <= (0 to HASH_RATE_WORDS - 1 => X"F", others => X"0");
         outbuf_last                      <= to_std_logic(digest_last);
         outbuf_valid                     <= '1';
 
@@ -430,14 +427,17 @@ begin
             hash_mode       <= inbuf_hm;
             step_counter    <= (others => '0');
             perm_slim_steps <= FALSE;
-            if inbuf_hm then
-              sparkle_state <= (others => (others => '0'));
-              state         <= S_PROCESS_TEXT;
-            else
-              sparkle_state <= inbuf & keybuf; -- first nonce then key
-              -- if bdo_valid = '0' then
-              if inbuf_valid = '1' and inbuf_ready = '1' then -- implies keybuf_valid = '1'
-                state <= S_PERMUTE;
+
+            if inbuf_valid = '1' then
+              if inbuf_hm then
+                sparkle_state <= (others => (others => '0'));
+                state         <= S_PROCESS_TEXT;
+              else
+                sparkle_state <= inbuf & keybuf; -- first nonce then key
+                -- if bdo_valid = '0' then
+                if inbuf_ready = '1' then -- implies keybuf_valid = '1'
+                  state <= S_PERMUTE;
+                end if;
               end if;
             end if;
           -- end if;
@@ -477,8 +477,8 @@ begin
             perm_slim_steps <= TRUE;
             if outbuf_ready then
               outbuf_tagverif <= FALSE;
-              digest_last <= TRUE;
-              state       <= S_INIT when digest_last else S_PERMUTE;
+              digest_last     <= TRUE;
+              state           <= S_INIT when digest_last else S_PERMUTE;
             end if;
 
         end case;

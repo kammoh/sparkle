@@ -37,6 +37,17 @@
 # with_key_reuse         - False
 ###############################################################################
 
+
+#### Hash
+#### MsgID=7, KeyID=0, HM Size=128, Digest Size=32
+# Instruction: Opcode=Hash
+# TB :80007 (Encoding used by testbench)
+# Info :                 Hash_Tag, EOT=1, Last=1, Length=32 bytes
+HDR = 93000020
+DAT = 831F70FE536A5CFACAC8DF2383E81EB3910B8367125FF2BC3FDE0E0BA94DD70B
+# Status: Success
+STT = E0000000
+
 #### Hash
 #### MsgID=61, KeyID=0, HM Size=64, Digest Size=32
 # Instruction: Opcode=Hash
