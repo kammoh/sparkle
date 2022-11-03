@@ -153,8 +153,28 @@ begin
 
   shift_in <= fill_zeros or enq;
   GEN_SHIFT_IN_SMALL : if SMALL_CAP > 0 generate
+    process(clk)
+    begin
+      if rising_edge(clk) then
+        if shift_in then
+          if in_small_cap then
+            block_reg(0 to SMALL_CAP - 1) <= block_reg(1 to SMALL_CAP - 1) & next_word;
+          else
+            block_reg <= block_reg(1 to block_reg'high) & next_word;
+          end if;
+        end if;
+      end if;
+    end process;
     shift_in_small <= small when fill_zeros else in_small_cap = '1';
   else generate
+    process(clk)
+    begin
+      if rising_edge(clk) then
+        if shift_in then
+          block_reg <= block_reg(1 to block_reg'high) & next_word;
+        end if;
+      end if;
+    end process;
     shift_in_small <= FALSE;
   end generate;
 
@@ -164,13 +184,6 @@ begin
       if reset = '1' then
         word_valids <= (others => '0');
       else
-        if shift_in then
-          if shift_in_small then
-            block_reg(0 to SMALL_CAP - 1) <= block_reg(1 to SMALL_CAP - 1) & next_word;
-          else
-            block_reg <= block_reg(1 to block_reg'high) & next_word;
-          end if;
-        end if;
         if fill_zeros then              -- optimized-out when ZERO_FILL = FALSE
           if shift_in_small then
             word_valids(0 to SMALL_CAP - 1) <= word_valids(1 to SMALL_CAP - 1) & '0';
@@ -188,7 +201,7 @@ begin
             end if;
           else
             if shift_in_small then
-              word_valids(0 to SMALL_CAP - 1) <= word_valids(1 to SMALL_CAP - 1) & '1';
+              word_valids(0 to maximum(1, SMALL_CAP) - 1) <= word_valids(1 to SMALL_CAP - 1) & '1';
             else
               word_valids <= word_valids(1 to word_valids'high) & '1';
             end if;
