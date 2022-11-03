@@ -63,10 +63,16 @@ begin
     VALIDBYTES_PROC : process(clk)
     begin
       if rising_edge(clk) then
-        if enq then
-          validbytes <= in_valid_bytes;
-        elsif deq then
-          validbytes <= validbytes(1 to validbytes'high) & VB_ZERO;
+        if reset = '1' then
+          for i in validbytes'range loop
+            validbytes(i)(0) <= '0';
+          end loop;
+        else
+          if enq then
+            validbytes <= in_valid_bytes;
+          elsif deq then
+            validbytes <= validbytes(1 to validbytes'high) & VB_ZERO;
+          end if;
         end if;
       end if;
     end process;
