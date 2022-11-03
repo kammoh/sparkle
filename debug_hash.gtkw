@@ -1,0 +1,48 @@
+[*]
+[*] GTKWave Analyzer v3.4.0 (w)1999-2022 BSI
+[*] Thu Nov  3 01:02:48 2022
+[*]
+[dumpfile] "/Users/kamyar/src/sparkle/hash.ghw"
+[dumpfile_mtime] "Thu Nov  3 00:58:18 2022"
+[dumpfile_size] 27637
+[savefile] "/Users/kamyar/src/sparkle/debug_hash.gtkw"
+[timestart] 0
+[size] 1385 804
+[pos] 2927 -685
+*-26.806530 80000000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] top.
+[treeopen] top.lwc_tb.
+[treeopen] top.lwc_tb.uut.
+[treeopen] top.lwc_tb.uut.inst_cryptocore.
+[treeopen] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.
+[sst_width] 288
+[signals_width] 209
+[sst_expanded] 1
+[sst_vpaned_height] 239
+@28
+top.lwc_tb.uut.inst_cryptocore.sparkle_inst.clk
+@420
+top.lwc_tb.uut.inst_cryptocore.sparkle_inst.state
+@23
+#{top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[31:0]} top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[31] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[30] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[29] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[28] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[27] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[26] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[25] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[24] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[23] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[22] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[21] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[20] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[19] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[18] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[17] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[16] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[15] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[14] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[13] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[12] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[11] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[10] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[9] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[8] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[7] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[6] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[5] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[4] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[3] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[2] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[1] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi[0]
+@28
+top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi_valid
+top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdi_ready
+@420
+top.lwc_tb.uut.inst_cryptocore.sparkle_inst.inbuf_hm
+@22
+#{top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[31:0]} top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[31] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[30] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[29] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[28] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[27] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[26] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[25] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[24] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[23] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[22] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[21] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[20] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[19] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[18] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[17] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[16] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[15] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[14] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[13] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[12] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[11] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[10] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[9] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[8] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[7] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[6] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[5] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[4] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[3] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[2] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[1] top.lwc_tb.uut.inst_cryptocore.sparkle_inst.bdo[0]
+@200
+-
+@28
+top.lwc_tb.uut.inst_cryptocore.sparkle_inst.inbuf_sipo.in_valid
+top.lwc_tb.uut.inst_cryptocore.sparkle_inst.inbuf_sipo.in_ready
+top.lwc_tb.uut.inst_cryptocore.sparkle_inst.inbuf_sipo.in_small_cap
+top.lwc_tb.uut.inst_cryptocore.sparkle_inst.inbuf_sipo.in_bits_last
+@420
+top.lwc_tb.uut.inst_cryptocore.sparkle_inst.inbuf_sipo.full
+@28
+top.lwc_tb.uut.inst_cryptocore.sparkle_inst.inbuf_sipo.out_valid
+top.lwc_tb.uut.inst_cryptocore.sparkle_inst.inbuf_sipo.out_ready
+[pattern_trace] 1
+[pattern_trace] 0

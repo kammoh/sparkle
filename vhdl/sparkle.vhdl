@@ -243,23 +243,23 @@ architecture RTL of sparkle is
 
   --============================================ Registers ==========================================================--
   signal sparkle_state                                                  : t_sparkle_state;
-  signal inbuf_validbytes                                               : t_rate_bytevalid;
+  signal inbuf_valid_bytes                                              : t_rate_bytevalid;
   signal step_counter                                                   : t_step_counter;
   signal state                                                          : t_fsm; --! FSM state
-  signal perm_slim_steps, inbuf_ct, inbuf_ad, inbuf_eoi                 : boolean;
+  signal perm_slim_steps, inbuf_ct, inbuf_ad, inbuf_eoi, inbuf_hm       : boolean;
   signal hash_mode, dec_mode                                            : boolean;
   signal outbuf_tag_or_digest, outbuf_tagverif, final_perm, digest_last : boolean;
 
   --============================================== Wires ============================================================--
   signal keybuf_slva                           : t_slv_array(0 to KEY_WORDS - 1)(IO_WIDTH - 1 downto 0);
   signal inbuf_slva, outbuf_slva               : t_slv_array(0 to MAX_RATE_WORDS - 1)(IO_WIDTH - 1 downto 0);
-  signal input_word, output_word               : std_logic_vector(IO_WIDTH - 1 downto 0);
-  signal output_validbytes                     : std_logic_vector(IO_WIDTH / 8 - 1 downto 0);
+  signal input_word                            : std_logic_vector(IO_WIDTH - 1 downto 0);
   signal keybuf                                : t_key_buffer;
   signal inbuf, outbuf                         : t_rate_buffer;
-  signal rho_whitened_state                    : t_sparkle_state;
+  signal rho_whi_add                           : t_sparkle_state;
   signal inbuf_valid, inbuf_ready              : std_logic;
   signal inbuf_valid_words, outbuf_valid_words : t_bit_array(0 to MAX_RATE_WORDS - 1);
+  signal outbuf_valid_bytes                    : t_rate_bytevalid;
   signal keybuf_valid, keybuf_ready            : std_logic;
   signal outbuf_valid, outbuf_ready            : std_logic;
   signal inbuf_last, inbuf_incomp              : std_logic;
@@ -271,52 +271,56 @@ begin
     generic map(
       WORD_WIDTH       => IO_WIDTH,
       NUM_WORDS        => MAX_RATE_WORDS,
+      SMALL_CAP        => HASH_RATE_WORDS,
       WITH_VALID_BYTES => TRUE,
       ZERO_FILL        => TRUE,
       PADDING_BYTE     => X"80",
       PIPELINED        => TRUE
     )
     port map(
-      clk                  => clk,
-      reset                => reset,
-      in_bits_word         => input_word,
-      in_bits_last         => bdi_last,
-      in_bits_valid_bytes  => bdi_validbytes,
-      in_valid             => bdi_valid,
-      in_ready             => bdi_ready,
-      out_bits_block       => inbuf_slva,
-      out_bits_valid_words => inbuf_valid_words,
-      out_bits_bva         => inbuf_validbytes,
-      out_bits_last        => inbuf_last,
-      out_bits_incomp      => inbuf_incomp,
-      out_valid            => inbuf_valid,
-      out_ready            => inbuf_ready
+      clk             => clk,
+      reset           => reset,
+      in_data         => input_word,
+      in_last         => bdi_last,
+      in_valid_bytes  => bdi_validbytes,
+      in_small_cap    => hash_op,
+      in_valid        => bdi_valid,
+      in_ready        => bdi_ready,
+      out_data        => inbuf_slva,
+      out_valid_words => inbuf_valid_words,
+      out_valid_bytes => inbuf_valid_bytes,
+      out_last        => inbuf_last,
+      out_incomplete  => inbuf_incomp,
+      out_valid       => inbuf_valid,
+      out_ready       => inbuf_ready
     );
 
   KEY_SIPO : entity work.SPARKLE_SIPO
     generic map(
       WORD_WIDTH       => IO_WIDTH,
       NUM_WORDS        => KEY_WORDS,
+      SMALL_CAP        => -1,
       WITH_VALID_BYTES => FALSE,
       ZERO_FILL        => FALSE,
       PADDING_BYTE     => (others => '0'),
       PIPELINED        => TRUE
     )
     port map(
-      clk                  => clk,
-      reset                => reset,
-      in_bits_word         => key,
-      in_bits_last         => '0',      -- ignored
-      in_bits_valid_bytes  => (others => '-'), -- ignored
-      in_valid             => key_valid,
-      in_ready             => key_ready,
-      out_bits_block       => keybuf_slva,
-      out_bits_valid_words => open,     -- ignored
-      out_bits_bva         => open,     -- ignored
-      out_bits_last        => open,     -- ignored
-      out_bits_incomp      => open,     -- ignored
-      out_valid            => keybuf_valid,
-      out_ready            => keybuf_ready
+      clk             => clk,
+      reset           => reset,
+      in_data         => key,
+      in_last         => '0',           -- ignored
+      in_valid_bytes  => (others => '-'), -- ignored
+      in_small_cap    => '0',           -- ignored
+      in_valid        => key_valid,
+      in_ready        => key_ready,
+      out_data        => keybuf_slva,
+      out_valid_words => open,          -- ignored
+      out_valid_bytes => open,          -- ignored
+      out_last        => open,          -- ignored
+      out_incomplete  => open,          -- ignored
+      out_valid       => keybuf_valid,
+      out_ready       => keybuf_ready
     );
 
   OUTBUF_PISO : entity work.SPARKLE_PISO
@@ -326,31 +330,28 @@ begin
       WITH_VALID_BYTES => TRUE
     )
     port map(
-      clk                  => clk,
-      reset                => reset,
-      in_bits_block        => outbuf_slva,
-      in_bits_valid_words  => outbuf_valid_words,
-      in_bits_valid_bytes  => inbuf_validbytes, -- for TAG and DIGEST we ignore out_bits_valid_bytes
-      in_bits_last         => outbuf_last,
-      in_valid             => outbuf_valid,
-      in_ready             => outbuf_ready,
-      out_bits_word        => output_word,
-      out_bits_last        => bdo_last,
-      out_bits_valid_bytes => output_validbytes,
-      out_valid            => bdo_valid,
-      out_ready            => bdo_ready
+      clk             => clk,
+      reset           => reset,
+      in_data         => outbuf_slva,
+      in_valid_words  => outbuf_valid_words,
+      in_valid_bytes  => outbuf_valid_bytes,
+      in_last         => outbuf_last,
+      in_valid        => outbuf_valid,
+      in_ready        => outbuf_ready,
+      out_data        => bdo,
+      out_last        => bdo_last,
+      out_valid_bytes => bdo_valid_bytes,
+      out_valid       => bdo_valid,
+      out_ready       => bdo_ready
     );
 
   --============================================== Assigns ==========================================================--
-  keybuf          <= to_uint32_array(keybuf_slva);
-  inbuf           <= to_uint32_array(inbuf_slva);
-  outbuf_slva     <= to_slva(outbuf);
-  input_word      <= padword(bdi, bdi_validbytes, TRUE);
-  last_step       <= (perm_slim_steps and (step_counter = (SPARKLE_STEPS_SLIM - 1))) or step_counter = (SPARKLE_STEPS_BIG - 1);
-  --
-  bdo_tagverif    <= to_std_logic(outbuf_tagverif);
-  bdo_valid_bytes <= (others => '1') when outbuf_tag_or_digest else output_validbytes;
-  bdo             <= padword(output_word, bdo_valid_bytes, FALSE);
+  keybuf       <= to_uint32_array(keybuf_slva);
+  inbuf        <= to_uint32_array(inbuf_slva);
+  outbuf_slva  <= to_slva(outbuf);
+  input_word   <= padword(bdi, bdi_validbytes, TRUE);
+  last_step    <= (perm_slim_steps and (step_counter = (SPARKLE_STEPS_SLIM - 1))) or step_counter = (SPARKLE_STEPS_BIG - 1);
+  bdo_tagverif <= to_std_logic(outbuf_tagverif);
 
   --============================================ Processes ==========================================================--
 
@@ -360,7 +361,7 @@ begin
     variable tmp_state  : t_sparkle_state;
   begin
     rho_whi_or_addmsg(
-      inbuf_ct, inbuf_ad, hash_mode, inbuf_last, inbuf_incomp, inbuf, inbuf_validbytes, sparkle_state,
+      inbuf_ct, inbuf_ad, inbuf_hm, inbuf_last, inbuf_incomp, inbuf, inbuf_valid_bytes, sparkle_state,
       tmp_outbuf, tmp_state
     );
 
@@ -371,7 +372,8 @@ begin
     outbuf_last        <= inbuf_last;
     outbuf             <= tmp_outbuf;
     outbuf_valid_words <= inbuf_valid_words;
-    rho_whitened_state <= tmp_state;
+    outbuf_valid_bytes <= inbuf_valid_bytes;
+    rho_whi_add        <= tmp_state;
     inbuf_ready        <= '0';
     keybuf_ready       <= '0';
     outbuf_valid       <= '0';
@@ -385,21 +387,23 @@ begin
       -- end if;
 
       when S_PROCESS_TEXT =>
-        inbuf_ready  <= to_std_logic(inbuf_ad) or outbuf_ready;
-        outbuf_valid <= not to_std_logic(inbuf_ad) and inbuf_valid;
+        inbuf_ready  <= to_std_logic(inbuf_ad or inbuf_hm) or outbuf_ready;
+        outbuf_valid <= not to_std_logic(inbuf_ad or inbuf_hm) and inbuf_valid;
 
       when S_PERMUTE =>
         null;
 
       when S_TAG =>
         outbuf(0 to TAG_WORDS - 1) <= tag;
-        outbuf_valid_words         <= (X"F", others => '0');
+        outbuf_valid_words         <= X"F0";
+        outbuf_valid_bytes         <= (others => X"F"); -- extra but ok since valid_words are not set
         outbuf_last                <= '1';
         outbuf_valid               <= '1';
 
       when S_DIGEST =>
         outbuf(0 to TAG_WORDS - 1) <= tag;
-        outbuf_valid_words         <= (X"F", others => '0');
+        outbuf_valid_words         <= X"FF";
+        outbuf_valid_bytes         <= (others => X"F");
         outbuf_last                <= to_std_logic(digest_last);
         outbuf_valid               <= '1';
 
@@ -415,6 +419,7 @@ begin
         inbuf_ad  <= bdi_type = HDR_AD;
         inbuf_ct  <= bdi_type = HDR_CT; -- TODO optimize?
         inbuf_eoi <= bdi_eoi = '1';
+        inbuf_hm  <= hash_op = '1';
       end if;
 
       if reset = '1' then
@@ -423,15 +428,21 @@ begin
         case state is
           when S_INIT =>
             digest_last     <= FALSE;
+            -- keep a copy of inbuf flags
             final_perm      <= inbuf_eoi;
             dec_mode        <= decrypt_op = '1';
+            hash_mode       <= inbuf_hm;
             step_counter    <= (others => '0');
             perm_slim_steps <= FALSE;
-            -- if bdo_valid = '0' then
-            if inbuf_valid = '1' and inbuf_ready = '1' then -- implies keybuf_valid = '1'
+            if inbuf_hm then
+              sparkle_state <= (others => (others => '0'));
+              state         <= S_PROCESS_TEXT;
+            else
               sparkle_state <= inbuf & keybuf; -- first nonce then key
-              state         <= S_PERMUTE;
-              hash_mode     <= hash_op = '1'; -- only update after nonce is absorbed
+              -- if bdo_valid = '0' then
+              if inbuf_valid = '1' and inbuf_ready = '1' then -- implies keybuf_valid = '1'
+                state <= S_PERMUTE;
+              end if;
             end if;
           -- end if;
 
@@ -449,14 +460,15 @@ begin
           when S_PROCESS_TEXT =>
             step_counter <= (others => '0');
             if inbuf_valid = '1' and (inbuf_ad or outbuf_ready = '1') then
-              sparkle_state   <= rho_whitened_state;
+              sparkle_state   <= rho_whi_add;
               perm_slim_steps <= inbuf_last = '0';
               state           <= S_PERMUTE;
               final_perm      <= inbuf_last = '1' and (not inbuf_ad or inbuf_eoi);
             end if;
-            if outbuf_valid and outbuf_ready then -- update only when outbuf is loaded
-              outbuf_tag_or_digest <= FALSE; -- overridden in FINALIZE_TAG
-              outbuf_tagverif      <= FALSE; -- overridden in FINALIZE_TAG
+            -- update only when outbuf is loaded
+            if outbuf_valid and outbuf_ready then
+              outbuf_tag_or_digest <= FALSE;
+              outbuf_tagverif      <= FALSE;
             end if;
 
           when S_TAG =>

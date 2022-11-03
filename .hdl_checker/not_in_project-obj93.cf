@@ -1,0 +1,5 @@
+v 4
+file / "/Users/kamyar/src/sparkle/vhdl/alzette.vhdl" "f8565788037676ead04ea77a6b3a2d9de59a476b" "20220128042217.148":
+  package alzette_defs at 1( 0) + 0 on 53;
+  entity alzette at 10( 202) + 0 on 54;
+  architecture rtl of alzette at 27( 563) + 0 on 55;

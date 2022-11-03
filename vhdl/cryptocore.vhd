@@ -41,6 +41,19 @@ entity cryptocore is
 end cryptocore;
 
 architecture RTL of cryptocore is
+  function padword(word        : std_logic_vector;
+                   valid_bytes : std_logic_vector
+                  ) return std_logic_vector is
+    variable ret : std_logic_vector(word'range) := word;
+  begin
+    for i in valid_bytes'range loop
+      if not valid_bytes(i) then
+        ret(8 * (i + 1) - 1 downto 8 * i) := (others => '0');
+      end if;
+    end loop;
+    return ret;
+  end function;
+
   --============================================ Registers ==========================================================--
   signal auth_success, send_auth : std_logic;
 
@@ -66,31 +79,28 @@ architecture RTL of cryptocore is
 
 begin
   SPARKLE_INST : entity work.sparkle
-    generic map(
-      IO_WIDTH => CCW
-    )
     port map(
-      clk                  => clk,
-      reset                => rst,
+      clk             => clk,
+      reset           => rst,
       key             => cc2_key_word,
-      key_valid            => cc2_key_valid,
-      key_ready            => cc2_key_ready,
-      key_update           => cc2_key_update,
-      bdi                  => cc2_bdi_word,
-      bdi_last             => cc2_bdi_last,
-      bdi_validbytes       => cc2_bdi_valid_bytes,
-      bdi_type             => bdi_type,
-      bdi_eoi              => cc2_bdi_eoi,
-      bdi_valid            => cc2_bdi_valid,
-      bdi_ready            => cc2_bdi_ready,
-      decrypt_op           => decrypt_in,
-      hash_op              => hash_in,
-      bdo        => cc2_bdo_word,
+      key_valid       => cc2_key_valid,
+      key_ready       => cc2_key_ready,
+      key_update      => cc2_key_update,
+      bdi             => cc2_bdi_word,
+      bdi_last        => cc2_bdi_last,
+      bdi_validbytes  => cc2_bdi_valid_bytes,
+      bdi_type        => bdi_type,
+      bdi_eoi         => cc2_bdi_eoi,
+      bdi_valid       => cc2_bdi_valid,
+      bdi_ready       => cc2_bdi_ready,
+      decrypt_op      => decrypt_in,
+      hash_op         => hash_in,
+      bdo             => cc2_bdo_word,
       bdo_last        => cc2_bdo_last,
       bdo_valid_bytes => cc2_bdo_valid_bytes,
-      bdo_tagverif         => cc2_bdo_tagverif,
-      bdo_valid            => cc2_bdo_valid,
-      bdo_ready            => cc2_bdo_ready
+      bdo_tagverif    => cc2_bdo_tagverif,
+      bdo_valid       => cc2_bdo_valid,
+      bdo_ready       => cc2_bdo_ready
     );
 
   cc2_key_word        <= reverse_bytes(key);

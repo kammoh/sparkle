@@ -1,0 +1,6 @@
+msgId,newKey,decrypt,adBytes,msgBytes,hash,longN+1
+1,False,False,0,256,True,False
+2,False,False,0,320,True,True
+3,False,False,0,16,True,False
+4,False,False,0,64,True,False
+5,False,False,0,1536,True,False

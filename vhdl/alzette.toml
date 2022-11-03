@@ -1,0 +1,9 @@
+name = 'alzette'
+
+[language]
+vhdl.standard = "2008"
+
+[rtl]
+sources = ["vhdl/alzette.vhdl"]
+top = "alzette"
+clock_port = "clk"

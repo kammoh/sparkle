@@ -15,21 +15,21 @@ entity SPARKLE_PISO is
     WITH_VALID_BYTES : boolean
   );
   port(
-    clk                  : in  std_logic;
-    reset                : in  std_logic;
+    clk             : in  std_logic;
+    reset           : in  std_logic;
     --
-    in_bits_block        : in  t_slv_array(0 to NUM_WORDS - 1)(WORD_WIDTH - 1 downto 0);
-    in_bits_valid_words  : in  t_bit_array(0 to NUM_WORDS - 1);
-    in_bits_valid_bytes  : in  t_slv_array(0 to NUM_WORDS - 1)(WORD_WIDTH / 8 - 1 downto 0);
-    in_bits_last         : in  std_logic;
-    in_valid             : in  std_logic;
-    in_ready             : out std_logic;
+    in_data         : in  t_slv_array(0 to NUM_WORDS - 1)(WORD_WIDTH - 1 downto 0);
+    in_valid_words  : in  t_bit_array(0 to NUM_WORDS - 1);
+    in_valid_bytes  : in  t_slv_array(0 to NUM_WORDS - 1)(WORD_WIDTH / 8 - 1 downto 0);
+    in_last         : in  std_logic;
+    in_valid        : in  std_logic;
+    in_ready        : out std_logic;
     --
-    out_bits_word        : out std_logic_vector(WORD_WIDTH - 1 downto 0);
-    out_bits_last        : out std_logic;
-    out_bits_valid_bytes : out std_logic_vector(WORD_WIDTH / 8 - 1 downto 0);
-    out_valid            : out std_logic;
-    out_ready            : in  std_logic
+    out_data        : out std_logic_vector(WORD_WIDTH - 1 downto 0);
+    out_last        : out std_logic;
+    out_valid_bytes : out std_logic_vector(WORD_WIDTH / 8 - 1 downto 0);
+    out_valid       : out std_logic;
+    out_ready       : in  std_logic
   );
 end entity SPARKLE_PISO;
 
@@ -50,24 +50,24 @@ begin
   last_or_empty <= validwords(1) /= '1';
   in_ready      <= '1' when empty or (last_or_empty and do_deq) else '0';
   out_valid     <= '0' when empty else '1';
-  out_bits_word <= data_block(0);
-  out_bits_last <= '1' when last_block = '1' and last_or_empty else '0'; -- correct if out_valid
+  out_data      <= data_block(0);
+  out_last      <= '1' when last_block = '1' and last_or_empty else '0'; -- correct if out_valid
 
   GEN_WITH_VALID_BYTES : if WITH_VALID_BYTES generate
-    out_bits_valid_bytes <= validbytes(0);
+    out_valid_bytes <= validbytes(0);
 
     VALIDBYTES_PROC : process(clk)
     begin
       if rising_edge(clk) then
         if do_enq then
-          validbytes <= in_bits_valid_bytes;
+          validbytes <= in_valid_bytes;
         elsif do_deq then
           validbytes(0 to validbytes'high - 1) <= validbytes(1 to validbytes'high);
         end if;
       end if;
     end process;
   else generate
-    out_bits_valid_bytes <= (others => '-');
+    out_valid_bytes <= (others => '-');
   end generate;
 
   VALIDWORDS_PROC : process(clk)
@@ -77,7 +77,7 @@ begin
         validwords(0) <= '0';
       else
         if do_enq then                  -- enq or enq+deq
-          validwords <= in_bits_valid_words;
+          validwords <= in_valid_words;
         elsif do_deq then
           validwords <= validwords(1 to validwords'high) & '0';
         end if;
@@ -89,8 +89,8 @@ begin
   begin
     if rising_edge(clk) then
       if do_enq then                    -- enq or enq+deq
-        data_block <= in_bits_block;
-        last_block <= in_bits_last;
+        data_block <= in_data;
+        last_block <= in_last;
       elsif do_deq then
         data_block(0 to data_block'high - 1) <= data_block(1 to data_block'high);
       end if;

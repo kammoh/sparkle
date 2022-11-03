@@ -16,30 +16,32 @@ use work.util_pkg.all;
 
 entity SPARKLE_SIPO is
   generic(
-    WORD_WIDTH       : positive                     := 32;              -- width of each word in bits
-    NUM_WORDS        : positive                     := 8;               -- depth
-    WITH_VALID_BYTES : boolean                      := FALSE;           -- if  for each byte a valid flag is stored
-    ZERO_FILL        : boolean                      := FALSE;           -- When `in_bits_last` fill `m` remaining free space with zeros in `m` clock cycles
-    PADDING_BYTE     : unsigned(7 downto 0)         := (others => '0'); -- padding byte
-    PIPELINED        : boolean                      := TRUE             -- simultanous dequeue and enqueue when full
+    WORD_WIDTH       : positive             := 32; -- width of each word in bits
+    NUM_WORDS        : positive             := 8; -- depth
+    SMALL_CAP        : integer              := -1; -- depth
+    WITH_VALID_BYTES : boolean              := FALSE; -- if  for each byte a valid flag is stored
+    ZERO_FILL        : boolean              := FALSE; -- When `in_bits_last` fill `m` remaining free space with zeros in `m` clock cycles
+    PADDING_BYTE     : unsigned(7 downto 0) := (others => '0'); -- padding byte
+    PIPELINED        : boolean              := TRUE -- simultanous dequeue and enqueue when full
   );
   port(
-    clk                  : in  std_logic;
-    reset                : in  std_logic;
+    clk             : in  std_logic;
+    reset           : in  std_logic;
     --
-    in_bits_word         : in  std_logic_vector(WORD_WIDTH - 1 downto 0);
-    in_bits_last         : in  std_logic; -- ignored if ZERO_FILL = FALSE
-    in_bits_valid_bytes  : in  std_logic_vector(WORD_WIDTH / 8 - 1 downto 0); -- valid bytes in a word
-    in_valid             : in  std_logic;
-    in_ready             : out std_logic;
+    in_data         : in  std_logic_vector(WORD_WIDTH - 1 downto 0);
+    in_last         : in  std_logic;    -- ignored if ZERO_FILL = FALSE
+    in_valid_bytes  : in  std_logic_vector(WORD_WIDTH / 8 - 1 downto 0); -- valid bytes in a word
+    in_small_cap    : in  std_logic := '0';
+    in_valid        : in  std_logic;
+    in_ready        : out std_logic;
     --
-    out_bits_block       : out t_slv_array(0 to NUM_WORDS - 1)(WORD_WIDTH - 1 downto 0);
-    out_bits_valid_words : out t_bit_array(0 to NUM_WORDS - 1); -- each bit shows the word is valid at all or not (could be empty, but valid!)
-    out_bits_bva         : out t_slv_array(0 to NUM_WORDS - 1)(WORD_WIDTH / 8 - 1 downto 0); -- array of valid bytes
-    out_bits_last        : out std_logic;
-    out_bits_incomp      : out std_logic; -- incomplete block (only if WITH_BYTE_VALIDS = TRUE)
-    out_valid            : out std_logic;
-    out_ready            : in  std_logic
+    out_data        : out t_slv_array(0 to NUM_WORDS - 1)(WORD_WIDTH - 1 downto 0);
+    out_valid_words : out t_bit_array(0 to NUM_WORDS - 1); -- each bit shows the word is valid at all or not (could be empty, but valid!)
+    out_valid_bytes : out t_slv_array(0 to NUM_WORDS - 1)(WORD_WIDTH / 8 - 1 downto 0); -- array of valid bytes
+    out_last        : out std_logic;
+    out_incomplete  : out std_logic;    -- incomplete block (only if WITH_BYTE_VALIDS = TRUE)
+    out_valid       : out std_logic;
+    out_ready       : in  std_logic
   );
 end entity SPARKLE_SIPO;
 
@@ -63,19 +65,19 @@ begin
   do_enq    <= in_valid = '1' and in_ready = '1';
   do_deq    <= out_valid = '1' and out_ready = '1';
 
-  out_valid       <= '1' when full else '0';
-  out_bits_last   <= last;
-  out_bits_incomp <= '1' when incomplete else '0';
+  out_valid      <= '1' when full else '0';
+  out_last       <= last;
+  out_incomplete <= '1' when incomplete else '0';
 
   COMB_PROC : process(all)
   begin
     -- VHDL is cursed!
     -- can't do: out_bits_block <= block_reg;
     for i in 0 to NUM_WORDS - 1 loop
-      out_bits_block(i) <= block_reg(i);
+      out_data(i) <= block_reg(i);
     end loop;
   end process;
-  out_bits_valid_words <= word_valids;
+  out_valid_words <= word_valids;
 
   GEN_FILL_ZERO : if ZERO_FILL generate
     GEM_PIPELINED_FZ : if PIPELINED generate
@@ -84,7 +86,7 @@ begin
       in_ready <= '1' when not fill_zeros and not full else '0';
     end generate;
 
-    next_word <= in_bits_word when not fill_zeros else std_logic_vector(resize(PADDING_BYTE, next_word'length)) when do_pad_byte else (others => '0');
+    next_word <= in_data when not fill_zeros else std_logic_vector(resize(PADDING_BYTE, next_word'length)) when do_pad_byte else (others => '0');
 
     process(clk)
     begin
@@ -97,8 +99,8 @@ begin
           end if;
           do_pad_byte <= FALSE;
           if do_enq then
-            if in_bits_last = '1' and (not one_short or do_deq) then
-              do_pad_byte <= in_bits_valid_bytes(WORD_WIDTH / 8 - 1) = '1';
+            if in_last = '1' and (not one_short or do_deq) then
+              do_pad_byte <= in_valid_bytes(WORD_WIDTH / 8 - 1) = '1';
               fill_zeros  <= TRUE;
             end if;
           end if;
@@ -112,20 +114,24 @@ begin
       in_ready <= '1' when not full else '0';
     end generate;
     fill_zeros <= FALSE;
-    next_word  <= in_bits_word;
+    next_word  <= in_data;
   end generate;
 
   GEN_WITH_BYTE_VALIDS : if WITH_VALID_BYTES generate
-    next_validbytes <= (others => '0') when fill_zeros else in_bits_valid_bytes;
+    next_validbytes <= (others => '0') when fill_zeros else in_valid_bytes;
 
     process(clk)
     begin
       if rising_edge(clk) then
         if do_enq then
-          incomplete <= ((not one_short or do_deq) and in_bits_last = '1') or in_bits_valid_bytes(WORD_WIDTH / 8 - 1) = '0';
+          incomplete <= ((not one_short or do_deq) and in_last = '1') or in_valid_bytes(WORD_WIDTH / 8 - 1) = '0';
         end if;
         if do_shiftin then
-          validbytes <= validbytes(1 to validbytes'high) & next_validbytes;
+          if SMALL_CAP > 0 and in_small_cap = '1' then
+            validbytes(0 to SMALL_CAP - 1) <= validbytes(1 to SMALL_CAP - 1) & next_validbytes;
+          else
+            validbytes <= validbytes(1 to validbytes'high) & next_validbytes;
+          end if;
         end if;
       end if;
     end process;
@@ -134,11 +140,11 @@ begin
     out_bits_bva_PROC : process(all)
     begin
       for i in 0 to NUM_WORDS - 1 loop
-        out_bits_bva(i) <= validbytes(i);
+        out_valid_bytes(i) <= validbytes(i);
       end loop;
     end process;
   else generate                         -- no per-byte support
-    out_bits_bva <= (others => (others => '-'));
+    out_valid_bytes <= (others => (others => '-'));
   end generate;
 
   do_shiftin <= fill_zeros or do_enq;
@@ -150,17 +156,33 @@ begin
         word_valids <= (others => '0');
       else
         if do_shiftin then
-          block_reg <= block_reg(1 to block_reg'high) & next_word;
+          if SMALL_CAP > 0 and in_small_cap = '1' then
+            block_reg(0 to SMALL_CAP - 1) <= block_reg(1 to SMALL_CAP - 1) & next_word;
+          else
+            block_reg <= block_reg(1 to block_reg'high) & next_word;
+          end if;
         end if;
         if fill_zeros then              -- optimized-out when ZERO_FILL = FALSE
-          word_valids <= word_valids(1 to word_valids'high) & '0'; -- FIXME this is probably wrong! should be '1' (and remove out_bits_valid_words)! word_valids is a gauge!
+          if SMALL_CAP > 0 and in_small_cap = '1' then
+            word_valids(0 to SMALL_CAP - 1) <= word_valids(1 to SMALL_CAP - 1) & '0';
+          else
+            word_valids <= word_valids(1 to word_valids'high) & '0'; -- FIXME this is probably wrong! should be '1' (and remove out_bits_valid_words)! word_valids is a gauge!
+          end if;
         end if;
         if do_enq then
-          last <= in_bits_last;
+          last <= in_last;
           if do_deq then                -- enq _and_ deq
-            word_valids <= (1 to word_valids'high => '0') & '1';
+            if SMALL_CAP > 0 and in_small_cap = '1' then
+              word_valids(0 to SMALL_CAP - 1) <= (1 to SMALL_CAP - 2 => '0') & '1' & (SMALL_CAP to word_valids'high => '0');
+            else
+              word_valids <= (1 to word_valids'high => '0') & '1';
+            end if;
           else
-            word_valids <= word_valids(1 to word_valids'high) & '1';
+            if SMALL_CAP > 0 and in_small_cap = '1' then
+              word_valids(0 to SMALL_CAP - 1) <= word_valids(1 to SMALL_CAP - 1) & '1';
+            else
+              word_valids <= word_valids(1 to word_valids'high) & '1';
+            end if;
           end if;
         elsif do_deq then
           word_valids <= (others => '0');

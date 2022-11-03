@@ -1,0 +1,18 @@
+
+9. Printing statistics.
+
+=== alzette ===
+
+   Number of wires:               1252
+   Number of wire bits:           1376
+   Number of public wires:           6
+   Number of public wire bits:     130
+   Number of memories:               0
+   Number of memory bits:            0
+   Number of processes:              0
+   Number of cells:               1310
+     $_AND_                        412
+     $_DFF_P_                       64
+     $_NOT_                        453
+     $_XOR_                        381
+
