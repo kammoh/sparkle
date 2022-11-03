@@ -38,6 +38,22 @@
 ###############################################################################
 
 #### Hash
+#### MsgID=61, KeyID=0, HM Size=64, Digest Size=32
+# Instruction: Opcode=Hash
+INS = 80000000
+# Info :                     Hash, EOI=1 EOT=1, Last=1, Length=64 bytes
+HDR = 77000040
+DAT = 1DD4C4FC575F5DBFC50CB4F2590C19DE221177B5EE549E536E36F3D535DFE57C542D0580AFD079014372561B002DA14607117214BEE4FC6DB8D4F4F48A20A640
+
+#### Hash
+#### MsgID=1, KeyID=0, HM Size=4, Digest Size=32
+# Instruction: Opcode=Hash
+INS = 80000000
+# Info :                     Hash, EOI=1 EOT=1, Last=1, Length=4 bytes
+HDR = 77000004
+DAT = 00010203
+
+#### Hash
 #### MsgID=1, KeyID=0, HM Size=4, Digest Size=32
 # Instruction: Opcode=Hash
 INS = 80000000

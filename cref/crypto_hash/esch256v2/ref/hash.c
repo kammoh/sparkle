@@ -30,6 +30,7 @@
 
 #include <stddef.h>  // for size_t
 #include <string.h>  // for memcpy, memset
+#include <stdio.h>
 #include "esch_cfg.h"
 #include "sparkle_ref.h"
 
@@ -60,10 +61,6 @@ typedef unsigned long long int ULLInt;
 ///////////////////////////////////////////////////////////////////////////////
 
 
-#define ROT(x, n) (((x) >> (n)) | ((x) << (32-(n))))
-#define ELL(x) (ROT(((x) ^ ((x) << 16)), 16))
-
-
 // Injection of a 16-byte block of the message to the state.
 
 static void add_msg_blk(SparkleState *state, const uint8_t *in, size_t inlen)
@@ -88,6 +85,8 @@ static void add_msg_blk(SparkleState *state, const uint8_t *in, size_t inlen)
     state->x[i] ^= (buffer[2*i] ^ tmpy);
     state->y[i] ^= (buffer[2*i+1] ^ tmpx);
   }
+
+  // print_state_ref(state, STATE_BRANS);
 }
 
 
@@ -179,5 +178,29 @@ int crypto_hash(UChar *out, const UChar *in, ULLInt inlen)
   ProcessMessage(&state, in, insize);
   Finalize(&state, out);
   
+  return 0;
+}
+
+void printhex(const UChar *b, ULLInt len) {
+  for (int i =0; i < len; i++){
+    printf("%02hhX", b[i]);
+    if (i % 4 == 3) {
+      printf(" ");
+    }
+  }
+} 
+
+int main() {
+  UChar digest[DIGEST_BYTES];
+  const UChar msg[] = {0x0, 0x1, 0x2, 0x3};
+  crypto_hash(digest, msg, sizeof(msg));
+
+  printf("message: ");
+  printhex(msg, sizeof(msg));
+  printf("\n");
+  printf("digest:  ");
+  printhex(digest, sizeof(digest));
+  printf("\n");
+
   return 0;
 }

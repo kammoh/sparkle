@@ -59,3 +59,7 @@ msgId,newKey,decrypt,adBytes,msgBytes,hash,longN+1
 58,False,True,0,1536,False,False
 59,False,True,1536,0,False,False
 60,False,True,1536,1536,False,False
+61,False,False,0,64,True,False
+62,False,False,0,128,True,True
+63,False,False,0,16,True,False
+64,False,False,0,1536,True,False

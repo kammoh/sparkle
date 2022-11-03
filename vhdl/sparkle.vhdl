@@ -1,6 +1,6 @@
 --===================================================================================================================--
 -- Author          Kamyar Mohajerani (kamyar@ieee.org)
--- Copyright       2021
+-- Copyright       2022
 -- VHDL Standard   2008
 -- Description     Schwaemm and Esch: Lightweight Authenticated Encryption and Hashing using the Sparkle Permutation
 -- TODO            Hashing (Esch)
@@ -52,8 +52,8 @@ architecture RTL of sparkle is
   constant TAG_WORDS          : positive := 4;
   constant KEY_WORDS          : positive := KEY_LEN / 32;
   constant STATE_BITS         : positive := 384;
-  constant STATE_BRANS        : positive := STATE_BITS / 64;
   constant STATE_WORDS        : positive := STATE_BITS / 32;
+  constant STATE_BRANS        : positive := STATE_WORDS / 2;
   constant HASH_RATE_WORDS    : positive := 128 / 32;
   constant AEAD_RATE_WORDS    : positive := 256 / 32;
   constant MAX_RATE_WORDS     : positive := maximum(HASH_RATE_WORDS, AEAD_RATE_WORDS);
@@ -149,15 +149,14 @@ architecture RTL of sparkle is
   end function;
 
   function padword(word        : std_logic_vector(IO_WIDTH - 1 downto 0);
-                   valid_bytes : std_logic_vector(IO_WIDTH/8 - 1 downto 0);
-                   pad_0x80    : boolean
+                   valid_bytes : std_logic_vector(IO_WIDTH/8 - 1 downto 0)
                   ) return std_logic_vector is
     variable ret : std_logic_vector(IO_WIDTH - 1 downto 0) := word;
   begin
     for i in valid_bytes'range loop
       if valid_bytes(i) = '0' then
         ret(8 * (i + 1) - 1 downto 8 * i) := (others => '0');
-        if pad_0x80 and i > 0 and valid_bytes(i - 1) = '1' then
+        if i > 0 and valid_bytes(i - 1) = '1' then
           ret(8 * (i + 1) - 1) := '1';
         end if;
       end if;
@@ -178,32 +177,25 @@ architecture RTL of sparkle is
     variable in_xor_state             : t_rate_buffer;
     variable wi, wj, z, t, tmpx, tmpy : t_uint32;
     variable j                        : natural;
-    variable const_x                  : unsigned(2 downto 0);
+    variable const_a                  : unsigned(2 downto 0);
+    variable const_m                  : unsigned(1 downto 0);
     variable state                    : t_sparkle_state := instate;
   begin
-    if hm then
-      if incomplete then
-        const_x := "001";
-      else
-        const_x := "010";
-      end if;
-    else
-      const_x := '1' & not to_std_logic(ad) & not incomplete;
-    end if;
+    const_a := '1' & not to_std_logic(ad) & not incomplete;
+    const_m := not incomplete & incomplete;
 
     if last_block = '1' then
-      state(STATE_WORDS - 1)(26 downto 24) := state(STATE_WORDS - 1)(26 downto 24) xor const_x;
+      if hm then
+        state(STATE_WORDS / 2 - 1)(25 downto 24) := state(STATE_WORDS / 2 - 1)(25 downto 24) xor const_m;
+      else
+        state(STATE_WORDS - 1)(26 downto 24) := state(STATE_WORDS - 1)(26 downto 24) xor const_a;
+      end if;
     end if;
 
-    for i in 0 to HASH_RATE_WORDS - 1 loop
+    outstate := state;
+
+    for i in 0 to AEAD_RATE_WORDS - 1 loop
       in_xor_state(i) := inbuf(i) xor state(i);
-    end loop;
-    for i in HASH_RATE_WORDS to AEAD_RATE_WORDS - 1 loop
-      if hm then
-        in_xor_state(i) := state(i);
-      else
-        in_xor_state(i) := inbuf(i) xor state(i);
-      end if;
     end loop;
     outbuf := in_xor_state;
 
@@ -225,15 +217,19 @@ architecture RTL of sparkle is
 
     tmpx := inbuf(0);
     tmpy := inbuf(1);
-    for i in 1 to STATE_WORDS / 4 loop
+    for i in 1 to HASH_RATE_WORDS / 2 - 1 loop
       tmpx := tmpx xor inbuf(2 * i);
       tmpy := tmpy xor inbuf(2 * i + 1);
     end loop;
 
     if hm then
-      for i in 0 to STATE_BRANS / 2 - 1 loop
+      for i in 0 to HASH_RATE_WORDS / 2 - 1 loop
         outstate(2 * i)     := in_xor_state(2 * i) xor ell(tmpy);
         outstate(2 * i + 1) := in_xor_state(2 * i + 1) xor ell(tmpx);
+      end loop;
+      for i in HASH_RATE_WORDS / 2 to STATE_WORDS / 4 - 1 loop
+        outstate(2 * i)     := outstate(2 * i) xor ell(tmpy);
+        outstate(2 * i + 1) := outstate(2 * i + 1) xor ell(tmpx);
       end loop;
     else
       outstate := state;
@@ -242,17 +238,17 @@ architecture RTL of sparkle is
   end procedure;
 
   --============================================ Registers ==========================================================--
-  signal sparkle_state                                                  : t_sparkle_state;
-  signal inbuf_valid_bytes                                              : t_rate_bytevalid;
-  signal step_counter                                                   : t_step_counter;
-  signal state                                                          : t_fsm; --! FSM state
-  signal perm_slim_steps, inbuf_ct, inbuf_ad, inbuf_eoi, inbuf_hm       : boolean;
-  signal hash_mode, dec_mode                                            : boolean;
-  signal outbuf_tag_or_digest, outbuf_tagverif, final_perm, digest_last : boolean;
+  signal sparkle_state                                            : t_sparkle_state;
+  signal inbuf_valid_bytes                                        : t_rate_bytevalid;
+  signal step_counter                                             : t_step_counter;
+  signal state                                                    : t_fsm; --! FSM state
+  signal perm_slim_steps, inbuf_ct, inbuf_ad, inbuf_eoi, inbuf_hm : boolean;
+  signal hash_mode, dec_mode                                      : boolean;
+  signal outbuf_tagverif, final_perm, digest_last                 : boolean;
 
   --============================================== Wires ============================================================--
   signal keybuf_slva                           : t_slv_array(0 to KEY_WORDS - 1)(IO_WIDTH - 1 downto 0);
-  signal inbuf_slva, outbuf_slva               : t_slv_array(0 to MAX_RATE_WORDS - 1)(IO_WIDTH - 1 downto 0);
+  signal inbuf_slva, outbuf_data               : t_slv_array(0 to MAX_RATE_WORDS - 1)(IO_WIDTH - 1 downto 0);
   signal input_word                            : std_logic_vector(IO_WIDTH - 1 downto 0);
   signal keybuf                                : t_key_buffer;
   signal inbuf, outbuf                         : t_rate_buffer;
@@ -332,7 +328,7 @@ begin
     port map(
       clk             => clk,
       reset           => reset,
-      in_data         => outbuf_slva,
+      in_data         => outbuf_data,
       in_valid_words  => outbuf_valid_words,
       in_valid_bytes  => outbuf_valid_bytes,
       in_last         => outbuf_last,
@@ -348,8 +344,8 @@ begin
   --============================================== Assigns ==========================================================--
   keybuf       <= to_uint32_array(keybuf_slva);
   inbuf        <= to_uint32_array(inbuf_slva);
-  outbuf_slva  <= to_slva(outbuf);
-  input_word   <= padword(bdi, bdi_validbytes, TRUE);
+  outbuf_data  <= to_slva(outbuf);
+  input_word   <= padword(bdi, bdi_validbytes);
   last_step    <= (perm_slim_steps and (step_counter = (SPARKLE_STEPS_SLIM - 1))) or step_counter = (SPARKLE_STEPS_BIG - 1);
   bdo_tagverif <= to_std_logic(outbuf_tagverif);
 
@@ -395,17 +391,17 @@ begin
 
       when S_TAG =>
         outbuf(0 to TAG_WORDS - 1) <= tag;
-        outbuf_valid_words         <= X"F0";
+        outbuf_valid_words         <= (0 to TAG_WORDS - 1 => '1', others => '0');
         outbuf_valid_bytes         <= (others => X"F"); -- extra but ok since valid_words are not set
         outbuf_last                <= '1';
         outbuf_valid               <= '1';
 
       when S_DIGEST =>
-        outbuf(0 to TAG_WORDS - 1) <= tag;
-        outbuf_valid_words         <= X"FF";
-        outbuf_valid_bytes         <= (others => X"F");
-        outbuf_last                <= to_std_logic(digest_last);
-        outbuf_valid               <= '1';
+        outbuf(0 to HASH_RATE_WORDS - 1) <= sparkle_state(0 to HASH_RATE_WORDS - 1);
+        outbuf_valid_words               <= (0 to HASH_RATE_WORDS - 1 => '1', others => '0');
+        outbuf_valid_bytes               <= (others => X"F");
+        outbuf_last                      <= to_std_logic(digest_last);
+        outbuf_valid                     <= '1';
 
     end case;
 
@@ -459,31 +455,30 @@ begin
 
           when S_PROCESS_TEXT =>
             step_counter <= (others => '0');
-            if inbuf_valid = '1' and (inbuf_ad or outbuf_ready = '1') then
+            if inbuf_valid and inbuf_ready then
               sparkle_state   <= rho_whi_add;
               perm_slim_steps <= inbuf_last = '0';
               state           <= S_PERMUTE;
               final_perm      <= inbuf_last = '1' and (not inbuf_ad or inbuf_eoi);
             end if;
             -- update only when outbuf is loaded
-            if outbuf_valid and outbuf_ready then
-              outbuf_tag_or_digest <= FALSE;
-              outbuf_tagverif      <= FALSE;
+            if (outbuf_valid = '1' or inbuf_hm) and outbuf_ready = '1' then
+              outbuf_tagverif <= FALSE;
             end if;
 
           when S_TAG =>
             if outbuf_ready then
-              outbuf_tag_or_digest <= TRUE;
-              outbuf_tagverif      <= dec_mode;
-              state                <= S_INIT;
+              outbuf_tagverif <= dec_mode;
+              state           <= S_INIT;
             end if;
 
           when S_DIGEST =>
-            step_counter <= (others => '0');
+            step_counter    <= (others => '0');
+            perm_slim_steps <= TRUE;
             if outbuf_ready then
-              outbuf_tag_or_digest <= TRUE;
-              digest_last          <= TRUE;
-              state                <= S_INIT when digest_last else S_PERMUTE;
+              outbuf_tagverif <= FALSE;
+              digest_last <= TRUE;
+              state       <= S_INIT when digest_last else S_PERMUTE;
             end if;
 
         end case;

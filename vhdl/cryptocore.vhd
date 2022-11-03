@@ -41,19 +41,6 @@ entity cryptocore is
 end cryptocore;
 
 architecture RTL of cryptocore is
-  function padword(word        : std_logic_vector;
-                   valid_bytes : std_logic_vector
-                  ) return std_logic_vector is
-    variable ret : std_logic_vector(word'range) := word;
-  begin
-    for i in valid_bytes'range loop
-      if not valid_bytes(i) then
-        ret(8 * (i + 1) - 1 downto 8 * i) := (others => '0');
-      end if;
-    end loop;
-    return ret;
-  end function;
-
   --============================================ Registers ==========================================================--
   signal auth_success, send_auth : std_logic;
 

@@ -24,10 +24,6 @@
 #include "sparkle_ref.h"
 
 
-#define ROT(x, n) (((x) >> (n)) | ((x) << (32-(n))))
-#define ELL(x) (ROT(((x) ^ ((x) << 16)), 16))
-
-
 // 4-round ARX-box
 #define ARXBOX(x, y, c)                     \
   (x) += ROT((y), 31), (y) ^= ROT((x), 24), \

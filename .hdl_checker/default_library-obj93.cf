@@ -1,9 +1,0 @@
-v 4
-file / "/Users/kamyar/src/sparkle/vhdl/LWC/LWC_pkg.vhd" "b85b6a17848d9acb1ec63627342511a9aa2ed3d5" "20220128040600.087":
-  package lwc_pkg at 32( 1539) + 0 on 14 body;
-  package body lwc_pkg at 205( 8974) + 0 on 15;
-file / "/Users/kamyar/src/sparkle/vhdl/LWC_config.vhd" "3a691c54d82adf79d646c737382ea0db17b8a374" "20220128040559.728":
-  package lwc_config at 29( 1475) + 0 on 11;
-file / "/Users/kamyar/src/sparkle/vhdl/LWC/NIST_LWAPI_pkg.vhd" "34aca990ee0f4d89f5c425c9d83f8bff0d6ae3aa" "20220128040559.990":
-  package nist_lwapi_pkg at 34( 1708) + 0 on 12 body;
-  package body nist_lwapi_pkg at 102( 4599) + 0 on 13;

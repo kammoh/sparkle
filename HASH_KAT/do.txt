@@ -38,6 +38,26 @@
 ###############################################################################
 
 #### Hash
+#### MsgID=61, KeyID=0, HM Size=64, Digest Size=32
+# Instruction: Opcode=Hash
+# TB :8003D (Encoding used by testbench)
+# Info :                 Hash_Tag, EOT=1, Last=1, Length=32 bytes
+HDR = 93000020
+DAT = 89D357C83D7A806574C18CB3E6C9FB638AB3406E142392A51E5273173DE5D5D1
+# Status: Success
+STT = E0000000
+
+#### Hash
+#### MsgID=1, KeyID=0, HM Size=4, Digest Size=32
+# Instruction: Opcode=Hash
+# TB :80001 (Encoding used by testbench)
+# Info :                 Hash_Tag, EOT=1, Last=1, Length=32 bytes
+HDR = 93000020
+DAT = 649D3E5258E504EF842A7176108D36A823E751D5E0EE31E3FAF111415BB9BBC2
+# Status: Success
+STT = E0000000
+
+#### Hash
 #### MsgID=1, KeyID=0, HM Size=4, Digest Size=32
 # Instruction: Opcode=Hash
 # TB :80001 (Encoding used by testbench)

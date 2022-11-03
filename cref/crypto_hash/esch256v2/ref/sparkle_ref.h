@@ -21,6 +21,10 @@
 #ifndef SPARKLE_REF_H
 #define SPARKLE_REF_H
 
+
+#define ROT(x, n) (((x) >> (n)) | ((x) << (32-(n))))
+#define ELL(x) (ROT(((x) ^ ((x) << 16)), 16))
+
 #if defined(_MSC_VER) && !defined(__clang__) && !defined(__ICL)
 typedef unsigned __int8 uint8_t;
 typedef unsigned __int32 uint32_t;
