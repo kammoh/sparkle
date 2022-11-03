@@ -1,8 +1,8 @@
 name = "Sparkle_GMU_vhdl"
 
 dependencies = [
-    # "git+https://github.com/GMUCERG/LWC.git#hardware/LWC_32.toml"
-    "../../lwc/LWC/hardware/LWC_32.toml"
+    "git+https://github.com/GMUCERG/LWC.git#hardware/LWC_32.toml"
+    # "../../lwc/LWC/hardware/LWC_32.toml"
 ]
 
 [language]
